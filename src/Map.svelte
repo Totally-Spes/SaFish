@@ -1,6 +1,7 @@
 <script>
     import { onDestroy, setContext} from 'svelte';
     import { mapbox, key } from './mapbox.js';
+    import * as mapboxgl from 'mapbox-gl';
     import * as MaplibreGrid from 'maplibre-grid';
     import { getGrid, getGridCell } from 'maplibre-grid/src/calc';
     import MapMarker from './MapMarker.svelte';
@@ -38,9 +39,9 @@
 			zoom,
 		});
         // Add zoom and rotation controls to the map.
-        // map.addControl(new mapboxgl.NavigationControl());
+        map.addControl(new mapboxgl.NavigationControl());
         grid = new MaplibreGrid.Grid({
-            gridWidth: 10,
+            gridWidth: 10,  
             gridHeight: 10,
             units: 'kilometers',
             minZoom: 7,
@@ -70,7 +71,23 @@
             }
         })
     }
-
+    function dirtLayer()
+    {
+        // map.addLayer({
+        //     'id': 'dirt',
+        //     'type': 'raster',
+        //     'source': {
+        //     'type': "raster",
+        //     'tiles': ['https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png'],
+        //     'tileSize': 256
+        //     },
+        //     "minzoom": 1,
+        //     "maxzoom": 22,
+        //     "paint": {
+        //     "raster-opacity": 1
+        //     }
+        // })
+    }
     function initLine(){
         data = { 'type': 'Feature',
             'properties': {},
@@ -143,6 +160,7 @@
 {#if map}
     {map.on('load', () => {
         seaLayer();
+        dirtLayer();
         initLine();
         map.addSource(selectedCellsId, {
             type: 'geojson',
@@ -158,19 +176,14 @@
                 'fill-outline-color': 'transparent'
             }
         });
-        // fetch("http://127.0.0.1:5001/api/location/getbox", 
-        //         {
-        //         mode: 'no-cors',
-        //         headers: {
-        //             'Access-Control-Allow-Origin':'*'
-        //         }
-        //         })
-        //         .then(x => {
-        //             console.log("response:");
-        //             console.log(x);
-        //             // selectBox([res[0][2],res[0][3],res[0][4],res[0][5]]);
-        //             // return x.json();
-        //         });
+        fetch("http://127.0.0.1:5001/api/location/getbox").then(x => x.json()).then(x => {
+            console.log(x)
+            x.forEach(element => {
+                var bbox = [element[2],element[3],element[4],element[5]];
+                selectBox(bbox);
+            });
+        }
+        );
     })}
 
     {map.on(MaplibreGrid.GRID_CLICK_EVENT, event =>{
@@ -222,7 +235,7 @@
                 const bbox = getGridCell([iter_lon, iter_lat], 10, 10, 'kilometers');
                 // todo: set amount
                 let amount = 99;
-                const res = fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
+                fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
                 mode: 'no-cors',
                 headers: {
                     'Access-Control-Allow-Origin':'*'

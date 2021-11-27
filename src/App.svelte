@@ -171,10 +171,6 @@
 </form> -->
 <Map lat={40} lon={0} zoom={3.5} >
 </Map>
-<div class="map-container">
-	<Map lat={40} lon={0} zoom={3.5} >
-	</Map>
-</div>
 
 <style>
 	/* beginning of classes for login form */
