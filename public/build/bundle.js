@@ -94,6 +94,9 @@ var app = (function () {
         }
         return -1;
     }
+    function null_to_empty(value) {
+        return value == null ? '' : value;
+    }
     function append(target, node) {
         target.appendChild(node);
     }
@@ -102,6 +105,12 @@ var app = (function () {
     }
     function detach(node) {
         node.parentNode.removeChild(node);
+    }
+    function destroy_each(iterations, detaching) {
+        for (let i = 0; i < iterations.length; i += 1) {
+            if (iterations[i])
+                iterations[i].d(detaching);
+        }
     }
     function element(name) {
         return document.createElement(name);
@@ -128,6 +137,9 @@ var app = (function () {
     function children(element) {
         return Array.from(element.childNodes);
     }
+    function set_style(node, key, value, important) {
+        node.style.setProperty(key, value, important ? 'important' : '');
+    }
     function custom_event(type, detail, bubbles = false) {
         const e = document.createEvent('CustomEvent');
         e.initCustomEvent(type, bubbles, false, detail);
@@ -142,6 +154,9 @@ var app = (function () {
         if (!current_component)
             throw new Error('Function called outside component initialization');
         return current_component;
+    }
+    function onMount(fn) {
+        get_current_component().$$.on_mount.push(fn);
     }
     function onDestroy(fn) {
         get_current_component().$$.on_destroy.push(fn);
@@ -430,6 +445,15 @@ var app = (function () {
         dispatch_dev('SvelteDOMSetData', { node: text, data });
         text.data = data;
     }
+    function validate_each_argument(arg) {
+        if (typeof arg !== 'string' && !(arg && typeof arg === 'object' && 'length' in arg)) {
+            let msg = '{#each} only iterates over array-like objects.';
+            if (typeof Symbol === 'function' && arg && Symbol.iterator in arg) {
+                msg += ' You can use a spread to convert this iterable into an array.';
+            }
+            throw new Error(msg);
+        }
+    }
     function validate_slots(name, slot, keys) {
         for (const slot_key of Object.keys(slot)) {
             if (!~keys.indexOf(slot_key)) {
@@ -530,9 +554,424 @@ var app = (function () {
         'default': maplibreGrid_min$1
     }, [maplibreGrid_min]));
 
+    /**
+     * @module helpers
+     */
+    /**
+     * Earth Radius used with the Harvesine formula and approximates using a spherical (non-ellipsoid) Earth.
+     *
+     * @memberof helpers
+     * @type {number}
+     */
+    var earthRadius = 6371008.8;
+    /**
+     * Unit of measurement factors using a spherical (non-ellipsoid) earth radius.
+     *
+     * @memberof helpers
+     * @type {Object}
+     */
+    var factors = {
+        centimeters: earthRadius * 100,
+        centimetres: earthRadius * 100,
+        degrees: earthRadius / 111325,
+        feet: earthRadius * 3.28084,
+        inches: earthRadius * 39.37,
+        kilometers: earthRadius / 1000,
+        kilometres: earthRadius / 1000,
+        meters: earthRadius,
+        metres: earthRadius,
+        miles: earthRadius / 1609.344,
+        millimeters: earthRadius * 1000,
+        millimetres: earthRadius * 1000,
+        nauticalmiles: earthRadius / 1852,
+        radians: 1,
+        yards: earthRadius * 1.0936,
+    };
+    /**
+     * Wraps a GeoJSON {@link Geometry} in a GeoJSON {@link Feature}.
+     *
+     * @name feature
+     * @param {Geometry} geometry input geometry
+     * @param {Object} [properties={}] an Object of key-value pairs to add as properties
+     * @param {Object} [options={}] Optional Parameters
+     * @param {Array<number>} [options.bbox] Bounding Box Array [west, south, east, north] associated with the Feature
+     * @param {string|number} [options.id] Identifier associated with the Feature
+     * @returns {Feature} a GeoJSON Feature
+     * @example
+     * var geometry = {
+     *   "type": "Point",
+     *   "coordinates": [110, 50]
+     * };
+     *
+     * var feature = turf.feature(geometry);
+     *
+     * //=feature
+     */
+    function feature(geom, properties, options) {
+        if (options === void 0) { options = {}; }
+        var feat = { type: "Feature" };
+        if (options.id === 0 || options.id) {
+            feat.id = options.id;
+        }
+        if (options.bbox) {
+            feat.bbox = options.bbox;
+        }
+        feat.properties = properties || {};
+        feat.geometry = geom;
+        return feat;
+    }
+    /**
+     * Creates a {@link Point} {@link Feature} from a Position.
+     *
+     * @name point
+     * @param {Array<number>} coordinates longitude, latitude position (each in decimal degrees)
+     * @param {Object} [properties={}] an Object of key-value pairs to add as properties
+     * @param {Object} [options={}] Optional Parameters
+     * @param {Array<number>} [options.bbox] Bounding Box Array [west, south, east, north] associated with the Feature
+     * @param {string|number} [options.id] Identifier associated with the Feature
+     * @returns {Feature<Point>} a Point feature
+     * @example
+     * var point = turf.point([-75.343, 39.984]);
+     *
+     * //=point
+     */
+    function point(coordinates, properties, options) {
+        if (options === void 0) { options = {}; }
+        if (!coordinates) {
+            throw new Error("coordinates is required");
+        }
+        if (!Array.isArray(coordinates)) {
+            throw new Error("coordinates must be an Array");
+        }
+        if (coordinates.length < 2) {
+            throw new Error("coordinates must be at least 2 numbers long");
+        }
+        if (!isNumber(coordinates[0]) || !isNumber(coordinates[1])) {
+            throw new Error("coordinates must contain numbers");
+        }
+        var geom = {
+            type: "Point",
+            coordinates: coordinates,
+        };
+        return feature(geom, properties, options);
+    }
+    /**
+     * Convert a distance measurement (assuming a spherical Earth) from radians to a more friendly unit.
+     * Valid units: miles, nauticalmiles, inches, yards, meters, metres, kilometers, centimeters, feet
+     *
+     * @name radiansToLength
+     * @param {number} radians in radians across the sphere
+     * @param {string} [units="kilometers"] can be degrees, radians, miles, inches, yards, metres,
+     * meters, kilometres, kilometers.
+     * @returns {number} distance
+     */
+    function radiansToLength(radians, units) {
+        if (units === void 0) { units = "kilometers"; }
+        var factor = factors[units];
+        if (!factor) {
+            throw new Error(units + " units is invalid");
+        }
+        return radians * factor;
+    }
+    /**
+     * Convert a distance measurement (assuming a spherical Earth) from a real-world unit into radians
+     * Valid units: miles, nauticalmiles, inches, yards, meters, metres, kilometers, centimeters, feet
+     *
+     * @name lengthToRadians
+     * @param {number} distance in real units
+     * @param {string} [units="kilometers"] can be degrees, radians, miles, inches, yards, metres,
+     * meters, kilometres, kilometers.
+     * @returns {number} radians
+     */
+    function lengthToRadians(distance, units) {
+        if (units === void 0) { units = "kilometers"; }
+        var factor = factors[units];
+        if (!factor) {
+            throw new Error(units + " units is invalid");
+        }
+        return distance / factor;
+    }
+    /**
+     * Converts an angle in radians to degrees
+     *
+     * @name radiansToDegrees
+     * @param {number} radians angle in radians
+     * @returns {number} degrees between 0 and 360 degrees
+     */
+    function radiansToDegrees(radians) {
+        var degrees = radians % (2 * Math.PI);
+        return (degrees * 180) / Math.PI;
+    }
+    /**
+     * Converts an angle in degrees to radians
+     *
+     * @name degreesToRadians
+     * @param {number} degrees angle between 0 and 360 degrees
+     * @returns {number} angle in radians
+     */
+    function degreesToRadians(degrees) {
+        var radians = degrees % 360;
+        return (radians * Math.PI) / 180;
+    }
+    /**
+     * isNumber
+     *
+     * @param {*} num Number to validate
+     * @returns {boolean} true/false
+     * @example
+     * turf.isNumber(123)
+     * //=true
+     * turf.isNumber('foo')
+     * //=false
+     */
+    function isNumber(num) {
+        return !isNaN(num) && num !== null && !Array.isArray(num);
+    }
+
+    /**
+     * Unwrap a coordinate from a Point Feature, Geometry or a single coordinate.
+     *
+     * @name getCoord
+     * @param {Array<number>|Geometry<Point>|Feature<Point>} coord GeoJSON Point or an Array of numbers
+     * @returns {Array<number>} coordinates
+     * @example
+     * var pt = turf.point([10, 10]);
+     *
+     * var coord = turf.getCoord(pt);
+     * //= [10, 10]
+     */
+    function getCoord(coord) {
+        if (!coord) {
+            throw new Error("coord is required");
+        }
+        if (!Array.isArray(coord)) {
+            if (coord.type === "Feature" &&
+                coord.geometry !== null &&
+                coord.geometry.type === "Point") {
+                return coord.geometry.coordinates;
+            }
+            if (coord.type === "Point") {
+                return coord.coordinates;
+            }
+        }
+        if (Array.isArray(coord) &&
+            coord.length >= 2 &&
+            !Array.isArray(coord[0]) &&
+            !Array.isArray(coord[1])) {
+            return coord;
+        }
+        throw new Error("coord must be GeoJSON Point or an Array of numbers");
+    }
+
+    //http://en.wikipedia.org/wiki/Haversine_formula
+    //http://www.movable-type.co.uk/scripts/latlong.html
+    /**
+     * Calculates the distance between two {@link Point|points} in degrees, radians, miles, or kilometers.
+     * This uses the [Haversine formula](http://en.wikipedia.org/wiki/Haversine_formula) to account for global curvature.
+     *
+     * @name distance
+     * @param {Coord | Point} from origin point or coordinate
+     * @param {Coord | Point} to destination point or coordinate
+     * @param {Object} [options={}] Optional parameters
+     * @param {string} [options.units='kilometers'] can be degrees, radians, miles, or kilometers
+     * @returns {number} distance between the two points
+     * @example
+     * var from = turf.point([-75.343, 39.984]);
+     * var to = turf.point([-75.534, 39.123]);
+     * var options = {units: 'miles'};
+     *
+     * var distance = turf.distance(from, to, options);
+     *
+     * //addToMap
+     * var addToMap = [from, to];
+     * from.properties.distance = distance;
+     * to.properties.distance = distance;
+     */
+    function distance(from, to, options) {
+        if (options === void 0) { options = {}; }
+        var coordinates1 = getCoord(from);
+        var coordinates2 = getCoord(to);
+        var dLat = degreesToRadians(coordinates2[1] - coordinates1[1]);
+        var dLon = degreesToRadians(coordinates2[0] - coordinates1[0]);
+        var lat1 = degreesToRadians(coordinates1[1]);
+        var lat2 = degreesToRadians(coordinates2[1]);
+        var a = Math.pow(Math.sin(dLat / 2), 2) +
+            Math.pow(Math.sin(dLon / 2), 2) * Math.cos(lat1) * Math.cos(lat2);
+        return radiansToLength(2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)), options.units);
+    }
+
+    // http://en.wikipedia.org/wiki/Haversine_formula
+    /**
+     * Takes a {@link Point} and calculates the location of a destination point given a distance in
+     * degrees, radians, miles, or kilometers; and bearing in degrees.
+     * This uses the [Haversine formula](http://en.wikipedia.org/wiki/Haversine_formula) to account for global curvature.
+     *
+     * @name destination
+     * @param {Coord} origin starting point
+     * @param {number} distance distance from the origin point
+     * @param {number} bearing ranging from -180 to 180
+     * @param {Object} [options={}] Optional parameters
+     * @param {string} [options.units='kilometers'] miles, kilometers, degrees, or radians
+     * @param {Object} [options.properties={}] Translate properties to Point
+     * @returns {Feature<Point>} destination point
+     * @example
+     * var point = turf.point([-75.343, 39.984]);
+     * var distance = 50;
+     * var bearing = 90;
+     * var options = {units: 'miles'};
+     *
+     * var destination = turf.destination(point, distance, bearing, options);
+     *
+     * //addToMap
+     * var addToMap = [point, destination]
+     * destination.properties['marker-color'] = '#f00';
+     * point.properties['marker-color'] = '#0f0';
+     */
+    function destination(origin, distance, bearing, options) {
+        if (options === void 0) { options = {}; }
+        // Handle input
+        var coordinates1 = getCoord(origin);
+        var longitude1 = degreesToRadians(coordinates1[0]);
+        var latitude1 = degreesToRadians(coordinates1[1]);
+        var bearingRad = degreesToRadians(bearing);
+        var radians = lengthToRadians(distance, options.units);
+        // Main
+        var latitude2 = Math.asin(Math.sin(latitude1) * Math.cos(radians) +
+            Math.cos(latitude1) * Math.sin(radians) * Math.cos(bearingRad));
+        var longitude2 = longitude1 +
+            Math.atan2(Math.sin(bearingRad) * Math.sin(radians) * Math.cos(latitude1), Math.cos(radians) - Math.sin(latitude1) * Math.sin(latitude2));
+        var lng = radiansToDegrees(longitude2);
+        var lat = radiansToDegrees(latitude2);
+        return point([lng, lat], options.properties);
+    }
+
+    /** @typedef {import('@turf/helpers').Units} Units */
+
+    /**
+     * @param {GeoJSON.BBox} bbox
+     * @param {number} gridWidth
+     * @param {number} gridHeight
+     * @param {Units} units
+     * @returns {GeoJSON.Feature<GeoJSON.LineString>[]}
+     */
+    function getGrid(bbox, gridWidth, gridHeight, units) {
+      // return rectangleGrid(bbox, gridWidth, gridHeight, { units });
+
+      const earthCircumference = Math.ceil(distance([0, 0], [180, 0], { units }) * 2);
+      const maxColumns = Math.floor(earthCircumference / gridWidth);
+      /** @type {(from: GeoJSON.Position, to: GeoJSON.Position, options: { units: Units }) => number} */
+      const fullDistance = (from, to, options) => {
+        const dist = distance(from, to, options);
+        if (Math.abs(to[0] - from[0]) >= 180) {
+          return earthCircumference - dist;
+        }
+        return dist;
+      };
+
+      /** @type {GeoJSON.Feature<GeoJSON.LineString>[]} */
+      const features = [];
+      const west = bbox[0];
+      const south = bbox[1];
+      const east = bbox[2];
+      const north = bbox[3];
+
+      // calculate grid start point
+      const deltaX = (west < 0 ? -1 : 1) * fullDistance([0, 0], [west, 0], { units });
+      const deltaY = (south < 0 ? -1 : 1) * fullDistance([0, 0], [0, south], { units });
+      const startDeltaX = Math.ceil(deltaX / gridWidth) * gridWidth;
+      const startDeltaY = Math.ceil(deltaY / gridHeight) * gridHeight;
+      /** @type {GeoJSON.Position} */
+      const startPoint = [
+        destination([0, 0], startDeltaX, 90, { units }).geometry.coordinates[0],
+        destination([0, 0], startDeltaY, 0, { units }).geometry.coordinates[1]
+      ];
+
+      // calculate grid columns and rows count
+      const width = fullDistance([west, 0], [east, 0], { units });
+      const height = fullDistance([0, south], [0, north], { units });
+      const columns = Math.min(Math.ceil(width / gridWidth), maxColumns);
+      const rows = Math.ceil(height / gridHeight);
+      // console.log(startPoint, columns, rows);
+
+      /** @type {GeoJSON.Position} */
+      let currentPoint;
+
+      // meridians
+      currentPoint = startPoint;
+      for (let i = 0; i < columns; i++) {
+        /** @type {GeoJSON.Position[]} */
+        const coordinates = [
+          [currentPoint[0], south],
+          [currentPoint[0], north]
+        ];
+        /** @type {GeoJSON.Feature<GeoJSON.LineString>} */
+        const feature = { type: 'Feature', geometry: { type: 'LineString', coordinates }, properties: {}};
+        features.push(feature);
+
+        currentPoint = [
+          destination([currentPoint[0], 0], gridWidth, 90, { units }).geometry.coordinates[0],
+          currentPoint[1]
+        ];
+      }
+
+      // parallels
+      currentPoint = startPoint;
+      for (let i = 0; i < rows; i++) {
+        /** @type {GeoJSON.Position[]} */
+        const coordinates = [
+          [west, currentPoint[1]],
+          [east, currentPoint[1]]
+        ];
+        /** @type {GeoJSON.Feature<GeoJSON.LineString>} */
+        const feature = { type: 'Feature', geometry: { type: 'LineString', coordinates }, properties: {}};
+        features.push(feature);
+
+        currentPoint = [
+          currentPoint[0],
+          destination([0, currentPoint[1]], gridHeight, 0, { units }).geometry.coordinates[1]
+        ];
+      }
+
+      return features;
+    }
+
+    /**
+     * @param {GeoJSON.Position} point
+     * @param {number} gridWidth
+     * @param {number} gridHeight
+     * @param {Units} units
+     * @returns {GeoJSON.BBox}
+     */
+    function getGridCell(point, gridWidth, gridHeight, units) {
+      const earthCircumference = Math.ceil(distance([0, 0], [180, 0], { units }) * 2);
+      /** @type {(from: GeoJSON.Position, to: GeoJSON.Position, options: { units: Units }) => number} */
+      const fullDistance = (from, to, options) => {
+        const dist = distance(from, to, options);
+        if (Math.abs(to[0] - from[0]) >= 180) {
+          return earthCircumference - dist;
+        }
+        return dist;
+      };
+
+      const deltaX = (point[0] < 0 ? -1 : 1) * fullDistance([0, 0], [point[0], 0], { units });
+      const deltaY = (point[1] < 0 ? -1 : 1) * fullDistance([0, 0], [0, point[1]], { units });
+      const minDeltaX = Math.floor(deltaX / gridWidth) * gridWidth;
+      const minDeltaY = Math.floor(deltaY / gridHeight) * gridHeight;
+      const maxDeltaX = Math.ceil(deltaX / gridWidth) * gridWidth;
+      const maxDeltaY = Math.ceil(deltaY / gridHeight) * gridHeight;
+      const bbox = /** @type {GeoJSON.BBox} */ ([
+        destination([0, 0], minDeltaX, 90, { units }).geometry.coordinates[0],
+        destination([0, 0], minDeltaY, 0, { units }).geometry.coordinates[1],
+        destination([0, 0], maxDeltaX, 90, { units }).geometry.coordinates[0],
+        destination([0, 0], maxDeltaY, 0, { units }).geometry.coordinates[1]
+      ]);
+
+      return bbox;
+    }
+
     /* src/MapMarker.svelte generated by Svelte v3.44.2 */
 
-    function create_fragment$2(ctx) {
+    function create_fragment$3(ctx) {
     	const block = {
     		c: noop,
     		l: function claim(nodes) {
@@ -547,7 +986,7 @@ var app = (function () {
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_fragment$2.name,
+    		id: create_fragment$3.name,
     		type: "component",
     		source: "",
     		ctx
@@ -556,7 +995,7 @@ var app = (function () {
     	return block;
     }
 
-    function instance$2($$self, $$props, $$invalidate) {
+    function instance$3($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
     	validate_slots('MapMarker', slots, []);
     	const { getMap } = getContext(key);
@@ -607,13 +1046,13 @@ var app = (function () {
     class MapMarker extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-    		init(this, options, instance$2, create_fragment$2, safe_not_equal, { lat: 0, lon: 1, label: 2 });
+    		init(this, options, instance$3, create_fragment$3, safe_not_equal, { lat: 0, lon: 1, label: 2 });
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
     			tagName: "MapMarker",
     			options,
-    			id: create_fragment$2.name
+    			id: create_fragment$3.name
     		});
 
     		const { ctx } = this.$$;
@@ -660,13 +1099,13 @@ var app = (function () {
     /* src/Map.svelte generated by Svelte v3.44.2 */
 
     const { console: console_1 } = globals;
-    const file = "src/Map.svelte";
+    const file$2 = "src/Map.svelte";
 
-    // (90:1) {#if map}
+    // (138:1) {#if map}
     function create_if_block_1(ctx) {
     	let current;
-    	const default_slot_template = /*#slots*/ ctx[10].default;
-    	const default_slot = create_slot(default_slot_template, ctx, /*$$scope*/ ctx[9], null);
+    	const default_slot_template = /*#slots*/ ctx[14].default;
+    	const default_slot = create_slot(default_slot_template, ctx, /*$$scope*/ ctx[13], null);
 
     	const block = {
     		c: function create() {
@@ -681,15 +1120,15 @@ var app = (function () {
     		},
     		p: function update(ctx, dirty) {
     			if (default_slot) {
-    				if (default_slot.p && (!current || dirty & /*$$scope*/ 512)) {
+    				if (default_slot.p && (!current || dirty & /*$$scope*/ 8192)) {
     					update_slot_base(
     						default_slot,
     						default_slot_template,
     						ctx,
-    						/*$$scope*/ ctx[9],
+    						/*$$scope*/ ctx[13],
     						!current
-    						? get_all_dirty_from_scope(/*$$scope*/ ctx[9])
-    						: get_slot_changes(default_slot_template, /*$$scope*/ ctx[9], dirty, null),
+    						? get_all_dirty_from_scope(/*$$scope*/ ctx[13])
+    						: get_slot_changes(default_slot_template, /*$$scope*/ ctx[13], dirty, null),
     						null
     					);
     				}
@@ -713,19 +1152,19 @@ var app = (function () {
     		block,
     		id: create_if_block_1.name,
     		type: "if",
-    		source: "(90:1) {#if map}",
+    		source: "(138:1) {#if map}",
     		ctx
     	});
 
     	return block;
     }
 
-    // (95:0) {#if map}
+    // (143:0) {#if map}
     function create_if_block(ctx) {
-    	let t0_value = /*map*/ ctx[3].on('load', /*func*/ ctx[12]) + "";
+    	let t0_value = /*map*/ ctx[1].on('load', /*func*/ ctx[16]) + ""; //         mode: 'no-cors',
     	let t0;
     	let t1;
-    	let t2_value = /*map*/ ctx[3].on('click', /*func_1*/ ctx[13]) + "";
+    	let t2_value = /*map*/ ctx[1].on(maplibreGrid_min.GRID_CLICK_EVENT, /*func_1*/ ctx[17]) + "";
     	let t2;
 
     	const block = {
@@ -740,8 +1179,8 @@ var app = (function () {
     			insert_dev(target, t2, anchor);
     		},
     		p: function update(ctx, dirty) {
-    			if (dirty & /*map, data*/ 24 && t0_value !== (t0_value = /*map*/ ctx[3].on('load', /*func*/ ctx[12]) + "")) set_data_dev(t0, t0_value);
-    			if (dirty & /*map, lon, lat, data*/ 27 && t2_value !== (t2_value = /*map*/ ctx[3].on('click', /*func_1*/ ctx[13]) + "")) set_data_dev(t2, t2_value);
+    			if (dirty & /*map*/ 2 && t0_value !== (t0_value = /*map*/ ctx[1].on('load', /*func*/ ctx[16]) + "")) set_data_dev(t0, t0_value); //         mode: 'no-cors',
+    			if (dirty & /*map, data*/ 6 && t2_value !== (t2_value = /*map*/ ctx[1].on(maplibreGrid_min.GRID_CLICK_EVENT, /*func_1*/ ctx[17]) + "")) set_data_dev(t2, t2_value);
     		},
     		d: function destroy(detaching) {
     			if (detaching) detach_dev(t0);
@@ -754,15 +1193,16 @@ var app = (function () {
     		block,
     		id: create_if_block.name,
     		type: "if",
-    		source: "(95:0) {#if map}",
+    		source: "(143:0) {#if map}",
     		ctx
     	});
 
     	return block;
     }
 
-    function create_fragment$1(ctx) {
-    	let link;
+    function create_fragment$2(ctx) {
+    	let link0;
+    	let link1;
     	let t0;
     	let div;
     	let t1;
@@ -770,49 +1210,57 @@ var app = (function () {
     	let current;
     	let mounted;
     	let dispose;
-    	let if_block0 = /*map*/ ctx[3] && create_if_block_1(ctx);
-    	let if_block1 = /*map*/ ctx[3] && create_if_block(ctx);
+    	let if_block0 = /*map*/ ctx[1] && create_if_block_1(ctx);
+    	let if_block1 = /*map*/ ctx[1] && create_if_block(ctx);
 
     	const block = {
     		c: function create() {
-    			link = element("link");
+    			link0 = element("link");
+    			link1 = element("link");
     			t0 = space();
     			div = element("div");
     			if (if_block0) if_block0.c();
     			t1 = space();
     			if (if_block1) if_block1.c();
     			if_block1_anchor = empty();
-    			attr_dev(link, "rel", "stylesheet");
-    			attr_dev(link, "href", "https://unpkg.com/mapbox-gl/dist/mapbox-gl.css");
-    			add_location(link, file, 81, 1, 1804);
+    			attr_dev(link0, "rel", "stylesheet");
+    			attr_dev(link0, "href", "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.0-2/css/all.min.css");
+    			add_location(link0, file$2, 126, 4, 3271);
+    			attr_dev(link1, "rel", "stylesheet");
+    			attr_dev(link1, "href", "https://unpkg.com/mapbox-gl/dist/mapbox-gl.css");
+    			add_location(link1, file$2, 127, 1, 3380);
+    			set_style(div, "width", "auto");
+    			set_style(div, "margin-left", "auto");
+    			set_style(div, "margin-right", "0");
     			attr_dev(div, "class", "svelte-1c44y5p");
-    			add_location(div, file, 88, 0, 1922);
+    			add_location(div, file$2, 136, 0, 3522);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
     		},
     		m: function mount(target, anchor) {
-    			append_dev(document.head, link);
+    			append_dev(document.head, link0);
+    			append_dev(document.head, link1);
     			insert_dev(target, t0, anchor);
     			insert_dev(target, div, anchor);
     			if (if_block0) if_block0.m(div, null);
-    			/*div_binding*/ ctx[11](div);
+    			/*div_binding*/ ctx[15](div);
     			insert_dev(target, t1, anchor);
     			if (if_block1) if_block1.m(target, anchor);
     			insert_dev(target, if_block1_anchor, anchor);
     			current = true;
 
     			if (!mounted) {
-    				dispose = listen_dev(link, "load", /*load*/ ctx[6], false, false, false);
+    				dispose = listen_dev(link1, "load", /*load*/ ctx[6], false, false, false);
     				mounted = true;
     			}
     		},
     		p: function update(ctx, [dirty]) {
-    			if (/*map*/ ctx[3]) {
+    			if (/*map*/ ctx[1]) {
     				if (if_block0) {
     					if_block0.p(ctx, dirty);
 
-    					if (dirty & /*map*/ 8) {
+    					if (dirty & /*map*/ 2) {
     						transition_in(if_block0, 1);
     					}
     				} else {
@@ -831,7 +1279,7 @@ var app = (function () {
     				check_outros();
     			}
 
-    			if (/*map*/ ctx[3]) {
+    			if (/*map*/ ctx[1]) {
     				if (if_block1) {
     					if_block1.p(ctx, dirty);
     				} else {
@@ -854,11 +1302,12 @@ var app = (function () {
     			current = false;
     		},
     		d: function destroy(detaching) {
-    			detach_dev(link);
+    			detach_dev(link0);
+    			detach_dev(link1);
     			if (detaching) detach_dev(t0);
     			if (detaching) detach_dev(div);
     			if (if_block0) if_block0.d();
-    			/*div_binding*/ ctx[11](null);
+    			/*div_binding*/ ctx[15](null);
     			if (detaching) detach_dev(t1);
     			if (if_block1) if_block1.d(detaching);
     			if (detaching) detach_dev(if_block1_anchor);
@@ -869,7 +1318,7 @@ var app = (function () {
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_fragment$1.name,
+    		id: create_fragment$2.name,
     		type: "component",
     		source: "",
     		ctx
@@ -878,94 +1327,69 @@ var app = (function () {
     	return block;
     }
 
-    function instance$1($$self, $$props, $$invalidate) {
+    function instance$2($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
     	validate_slots('Map', slots, ['default']);
     	setContext(key, { getMap: () => map });
     	let { lat } = $$props;
     	let { lon } = $$props;
     	let { zoom } = $$props;
+
+    	// const express = require("express");
+    	// const bodyParser = require("body-parser");
+    	// const cors = require('cors')
+    	// const app = express();
+    	// app.use(bodyParser.json());
+    	// app.use(cors())
     	let container;
+
     	let map;
     	let grid;
     	let path = [];
     	let data;
+    	let selectedCells = [];
+    	let selectedCellsId = 'selected-cells';
 
     	function load() {
-    		$$invalidate(3, map = new mapboxGl.Map({
+    		$$invalidate(1, map = new mapboxGl.Map({
     				container,
-    				style: 'mapbox://styles/mapbox/streets-v9',
+    				style: 'mapbox://styles/batlle/ckwhnl75t1g5514n46mzemfnz',
     				center: [lon, lat],
     				zoom
     			}));
 
+    		// Add zoom and rotation controls to the map.
+    		// map.addControl(new mapboxgl.NavigationControl());
     		grid = new maplibreGrid_min.Grid({
     				gridWidth: 10,
     				gridHeight: 10,
     				units: 'kilometers',
     				minZoom: 7,
     				maxZoom: 12,
-    				paint: { 'line-opacity': .5 }
+    				paint: { 'line-opacity': .5, "line-color": "#FFF" }
     			});
 
+    		// map.moveLayer('')
     		map.addControl(grid);
     	}
 
     	function seaLayer() {
-    		map.addLayer(
-    			{
-    				'id': 'openseamap',
-    				'type': 'raster',
-    				'source': {
-    					'type': "raster",
-    					'tiles': ['https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png'],
-    					'tileSize': 256
-    				},
-    				"minzoom": 1,
-    				"maxzoom": 22,
-    				"paint": { "raster-opacity": 1 }
-    			},
-    			'waterway-label'
-    		);
-    	}
-
-    	function drawLine() {
-    		map.addSource('path', { type: 'geojson', data });
-
     		map.addLayer({
-    			"id": "road",
-    			"type": "line",
-    			"source": 'path',
-    			"layout": {
-    				"line-join": "round",
-    				"line-cap": "round"
+    			'id': 'openseamap',
+    			'type': 'raster',
+    			'source': {
+    				'type': "raster",
+    				'tiles': ['https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png'],
+    				'tileSize': 256
     			},
-    			"paint": { "line-color": "#888", "line-width": 8 }
+    			"minzoom": 1,
+    			"maxzoom": 22,
+    			"paint": { "raster-opacity": 1 }
     		});
     	}
 
-    	onDestroy(() => {
-    		map.removeControl(grid);
-    		if (map) map.remove();
-    	});
-
-    	const writable_props = ['lat', 'lon', 'zoom'];
-
-    	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console_1.warn(`<Map> was created with unknown prop '${key}'`);
-    	});
-
-    	function div_binding($$value) {
-    		binding_callbacks[$$value ? 'unshift' : 'push'](() => {
-    			container = $$value;
-    			$$invalidate(2, container);
-    		});
-    	}
-
-    	const func = () => {
-    		seaLayer();
-
-    		$$invalidate(4, data = {
+    	function initLine() {
+    		$$invalidate(2, data = {
     			'type': 'Feature',
     			'properties': {},
     			'geometry': {
@@ -986,27 +1410,149 @@ var app = (function () {
     			},
     			"paint": { "line-color": "#F00", "line-width": 8 }
     		});
-    	};
+    	}
 
-    	const func_1 = function (e) {
-    		var coordinates = e.lngLat;
-    		$$invalidate(1, [lon, lat] = [coordinates.lng, coordinates.lat], lon, $$invalidate(0, lat));
+    	onDestroy(() => {
+    		map.removeControl(grid);
+    		if (map) map.remove();
+    	});
+
+    	function selectBox(bbox) {
+    		const cellIndex = selectedCells.findIndex(x => x.geometry.bbox.toString() === bbox.toString());
+
+    		if (cellIndex === -1) {
+    			const coordinates = [
+    				[
+    					[bbox[0], bbox[1]],
+    					[bbox[2], bbox[1]],
+    					[bbox[2], bbox[3]],
+    					[bbox[0], bbox[3]],
+    					[bbox[0], bbox[1]]
+    				]
+    			];
+
+    			const cell = {
+    				type: 'Feature',
+    				geometry: { type: 'Polygon', bbox, coordinates }
+    			};
+
+    			selectedCells.push(cell);
+    		}
+
+    		const source = map.getSource(selectedCellsId);
+
+    		source.setData({
+    			type: 'FeatureCollection',
+    			features: selectedCells
+    		});
+    	}
+
+    	const writable_props = ['lat', 'lon', 'zoom'];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console_1.warn(`<Map> was created with unknown prop '${key}'`);
+    	});
+
+    	function div_binding($$value) {
+    		binding_callbacks[$$value ? 'unshift' : 'push'](() => {
+    			container = $$value;
+    			$$invalidate(0, container);
+    		});
+    	}
+
+    	const func = () => {
+    		seaLayer();
+    		initLine();
+
+    		map.addSource(selectedCellsId, {
+    			type: 'geojson',
+    			data: {
+    				type: 'FeatureCollection',
+    				features: selectedCells
+    			}
+    		});
+
+    		map.addLayer({
+    			id: selectedCellsId,
+    			source: selectedCellsId,
+    			type: 'fill',
+    			paint: {
+    				'fill-color': '#00f',
+    				'fill-opacity': 0.2,
+    				'fill-outline-color': 'transparent'
+    			}
+    		});
+    	}; // fetch("http://127.0.0.1:5001/api/location/getbox", 
+    	//         {
+
+    	const func_1 = event => {
+    		console.log(event.bbox);
+    		var [lon1, lat1, lon2, lat2] = event.bbox;
+    		var lon = (lon1 + lon2) / 2;
+    		var lat = (lat1 + lat2) / 2;
+    		console.log([lon, lat]);
     		path.push([lon, lat]);
+    		selectBox(event.bbox);
+
+    		if (path.length > 1) {
+    			let [prev_lon, prev_lat] = path[path.length - 2];
+    			let [iter_lon, iter_lat] = [prev_lon, prev_lat];
+    			let lon_step = prev_lon < lon ? 0.01 : -0.01;
+    			let lat_step = prev_lat < lat ? 0.01 : -0.01;
+
+    			let latlondist = (lat1, lon1, lat2, lon2) => {
+    				let diff_lat = lat1 - lat2;
+    				let diff_lon = lon1 - lon2;
+    				return Math.sqrt(diff_lat * diff_lat + diff_lon * diff_lon);
+    			};
+
+    			let distance = latlondist(lat, lon, prev_lat, prev_lon) * 20;
+    			lon_step = (lon - prev_lon) / distance;
+    			lat_step = (lat - prev_lat) / distance;
+
+    			// console.log("source:");
+    			// console.log([prev_lon, prev_lat]);
+    			// console.log("destination:");
+    			// console.log([lon, lat]);
+    			// console.log("distance:");
+    			// console.log(distance);
+    			// console.log("step:");
+    			// console.log([lon_step, lat_step]);
+    			console.log("TRACE PATH START");
+
+    			for (let i = 0; i < distance; i++) {
+    				iter_lon += lon_step;
+    				iter_lat += lat_step;
+    				console.log([iter_lon, iter_lat]);
+    				const bbox = getGridCell([iter_lon, iter_lat], 10, 10, 'kilometers');
+
+    				// todo: set amount
+    				let amount = 99;
+
+    				fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
+    					mode: 'no-cors',
+    					headers: { 'Access-Control-Allow-Origin': '*' }
+    				});
+
+    				selectBox(bbox);
+    				console.log(bbox);
+    			}
+
+    			console.log("TRACE PATH END");
+    		}
 
     		if (path.length > 1) {
     			map.getSource('path').setData(data);
-    		} else {
-    			new MapMarker(lon, lat, "Start");
     		}
 
     		console.log(path);
     	};
 
     	$$self.$$set = $$props => {
-    		if ('lat' in $$props) $$invalidate(0, lat = $$props.lat);
-    		if ('lon' in $$props) $$invalidate(1, lon = $$props.lon);
-    		if ('zoom' in $$props) $$invalidate(8, zoom = $$props.zoom);
-    		if ('$$scope' in $$props) $$invalidate(9, $$scope = $$props.$$scope);
+    		if ('lat' in $$props) $$invalidate(10, lat = $$props.lat);
+    		if ('lon' in $$props) $$invalidate(11, lon = $$props.lon);
+    		if ('zoom' in $$props) $$invalidate(12, zoom = $$props.zoom);
+    		if ('$$scope' in $$props) $$invalidate(13, $$scope = $$props.$$scope);
     	};
 
     	$$self.$capture_state = () => ({
@@ -1015,7 +1561,10 @@ var app = (function () {
     		mapbox: mapboxGl,
     		key,
     		MaplibreGrid,
+    		getGrid,
+    		getGridCell,
     		MapMarker,
+    		onMount,
     		lat,
     		lon,
     		zoom,
@@ -1024,20 +1573,25 @@ var app = (function () {
     		grid,
     		path,
     		data,
+    		selectedCells,
+    		selectedCellsId,
     		load,
     		seaLayer,
-    		drawLine
+    		initLine,
+    		selectBox
     	});
 
     	$$self.$inject_state = $$props => {
-    		if ('lat' in $$props) $$invalidate(0, lat = $$props.lat);
-    		if ('lon' in $$props) $$invalidate(1, lon = $$props.lon);
-    		if ('zoom' in $$props) $$invalidate(8, zoom = $$props.zoom);
-    		if ('container' in $$props) $$invalidate(2, container = $$props.container);
-    		if ('map' in $$props) $$invalidate(3, map = $$props.map);
+    		if ('lat' in $$props) $$invalidate(10, lat = $$props.lat);
+    		if ('lon' in $$props) $$invalidate(11, lon = $$props.lon);
+    		if ('zoom' in $$props) $$invalidate(12, zoom = $$props.zoom);
+    		if ('container' in $$props) $$invalidate(0, container = $$props.container);
+    		if ('map' in $$props) $$invalidate(1, map = $$props.map);
     		if ('grid' in $$props) grid = $$props.grid;
-    		if ('path' in $$props) $$invalidate(5, path = $$props.path);
-    		if ('data' in $$props) $$invalidate(4, data = $$props.data);
+    		if ('path' in $$props) $$invalidate(3, path = $$props.path);
+    		if ('data' in $$props) $$invalidate(2, data = $$props.data);
+    		if ('selectedCells' in $$props) $$invalidate(4, selectedCells = $$props.selectedCells);
+    		if ('selectedCellsId' in $$props) $$invalidate(5, selectedCellsId = $$props.selectedCellsId);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -1045,14 +1599,18 @@ var app = (function () {
     	}
 
     	return [
-    		lat,
-    		lon,
     		container,
     		map,
     		data,
     		path,
+    		selectedCells,
+    		selectedCellsId,
     		load,
     		seaLayer,
+    		initLine,
+    		selectBox,
+    		lat,
+    		lon,
     		zoom,
     		$$scope,
     		slots,
@@ -1065,27 +1623,27 @@ var app = (function () {
     class Map$1 extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-    		init(this, options, instance$1, create_fragment$1, safe_not_equal, { lat: 0, lon: 1, zoom: 8 });
+    		init(this, options, instance$2, create_fragment$2, safe_not_equal, { lat: 10, lon: 11, zoom: 12 });
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
     			tagName: "Map",
     			options,
-    			id: create_fragment$1.name
+    			id: create_fragment$2.name
     		});
 
     		const { ctx } = this.$$;
     		const props = options.props || {};
 
-    		if (/*lat*/ ctx[0] === undefined && !('lat' in props)) {
+    		if (/*lat*/ ctx[10] === undefined && !('lat' in props)) {
     			console_1.warn("<Map> was created without expected prop 'lat'");
     		}
 
-    		if (/*lon*/ ctx[1] === undefined && !('lon' in props)) {
+    		if (/*lon*/ ctx[11] === undefined && !('lon' in props)) {
     			console_1.warn("<Map> was created without expected prop 'lon'");
     		}
 
-    		if (/*zoom*/ ctx[8] === undefined && !('zoom' in props)) {
+    		if (/*zoom*/ ctx[12] === undefined && !('zoom' in props)) {
     			console_1.warn("<Map> was created without expected prop 'zoom'");
     		}
     	}
@@ -1115,40 +1673,304 @@ var app = (function () {
     	}
     }
 
+    /* src/Menu.svelte generated by Svelte v3.44.2 */
+    const file$1 = "src/Menu.svelte";
+
+    function get_each_context(ctx, list, i) {
+    	const child_ctx = ctx.slice();
+    	child_ctx[4] = list[i];
+    	return child_ctx;
+    }
+
+    // (44:8) {#each navItems as item}
+    function create_each_block(ctx) {
+    	let li;
+    	let a;
+    	let t0_value = /*item*/ ctx[4].label + "";
+    	let t0;
+    	let t1;
+
+    	const block = {
+    		c: function create() {
+    			li = element("li");
+    			a = element("a");
+    			t0 = text(t0_value);
+    			t1 = space();
+    			attr_dev(a, "href", /*item*/ ctx[4].href);
+    			attr_dev(a, "class", "svelte-1ep5jdp");
+    			add_location(a, file$1, 45, 12, 1311);
+    			attr_dev(li, "class", "svelte-1ep5jdp");
+    			add_location(li, file$1, 44, 10, 1294);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, li, anchor);
+    			append_dev(li, a);
+    			append_dev(a, t0);
+    			append_dev(li, t1);
+    		},
+    		p: noop,
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(li);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_each_block.name,
+    		type: "each",
+    		source: "(44:8) {#each navItems as item}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function create_fragment$1(ctx) {
+    	let nav;
+    	let div2;
+    	let div1;
+    	let div0;
+    	let div1_class_value;
+    	let t;
+    	let ul;
+    	let ul_class_value;
+    	let mounted;
+    	let dispose;
+    	let each_value = /*navItems*/ ctx[1];
+    	validate_each_argument(each_value);
+    	let each_blocks = [];
+
+    	for (let i = 0; i < each_value.length; i += 1) {
+    		each_blocks[i] = create_each_block(get_each_context(ctx, each_value, i));
+    	}
+
+    	const block = {
+    		c: function create() {
+    			nav = element("nav");
+    			div2 = element("div");
+    			div1 = element("div");
+    			div0 = element("div");
+    			t = space();
+    			ul = element("ul");
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].c();
+    			}
+
+    			attr_dev(div0, "class", "middle-line svelte-1ep5jdp");
+    			add_location(div0, file$1, 40, 8, 1139);
+    			attr_dev(div1, "class", div1_class_value = "" + (null_to_empty(`mobile-icon${/*showMobileMenu*/ ctx[0] ? ' active' : ''}`) + " svelte-1ep5jdp"));
+    			add_location(div1, file$1, 39, 6, 1036);
+    			attr_dev(ul, "class", ul_class_value = "" + (null_to_empty(`navbar-list${/*showMobileMenu*/ ctx[0] ? ' mobile' : ''}`) + " svelte-1ep5jdp"));
+    			add_location(ul, file$1, 42, 6, 1190);
+    			attr_dev(div2, "class", "inner svelte-1ep5jdp");
+    			add_location(div2, file$1, 38, 4, 1010);
+    			attr_dev(nav, "class", "svelte-1ep5jdp");
+    			add_location(nav, file$1, 37, 2, 1000);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, nav, anchor);
+    			append_dev(nav, div2);
+    			append_dev(div2, div1);
+    			append_dev(div1, div0);
+    			append_dev(div2, t);
+    			append_dev(div2, ul);
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].m(ul, null);
+    			}
+
+    			if (!mounted) {
+    				dispose = listen_dev(div1, "click", /*handleMobileIconClick*/ ctx[2], false, false, false);
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, [dirty]) {
+    			if (dirty & /*showMobileMenu*/ 1 && div1_class_value !== (div1_class_value = "" + (null_to_empty(`mobile-icon${/*showMobileMenu*/ ctx[0] ? ' active' : ''}`) + " svelte-1ep5jdp"))) {
+    				attr_dev(div1, "class", div1_class_value);
+    			}
+
+    			if (dirty & /*navItems*/ 2) {
+    				each_value = /*navItems*/ ctx[1];
+    				validate_each_argument(each_value);
+    				let i;
+
+    				for (i = 0; i < each_value.length; i += 1) {
+    					const child_ctx = get_each_context(ctx, each_value, i);
+
+    					if (each_blocks[i]) {
+    						each_blocks[i].p(child_ctx, dirty);
+    					} else {
+    						each_blocks[i] = create_each_block(child_ctx);
+    						each_blocks[i].c();
+    						each_blocks[i].m(ul, null);
+    					}
+    				}
+
+    				for (; i < each_blocks.length; i += 1) {
+    					each_blocks[i].d(1);
+    				}
+
+    				each_blocks.length = each_value.length;
+    			}
+
+    			if (dirty & /*showMobileMenu*/ 1 && ul_class_value !== (ul_class_value = "" + (null_to_empty(`navbar-list${/*showMobileMenu*/ ctx[0] ? ' mobile' : ''}`) + " svelte-1ep5jdp"))) {
+    				attr_dev(ul, "class", ul_class_value);
+    			}
+    		},
+    		i: noop,
+    		o: noop,
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(nav);
+    			destroy_each(each_blocks, detaching);
+    			mounted = false;
+    			dispose();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$1.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$1($$self, $$props, $$invalidate) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots('Menu', slots, []);
+    	let showMobileMenu = false;
+
+    	// List of navigation items
+    	const navItems = [
+    		{ label: "logo", href: "#" },
+    		{ label: "Item 1", href: "#" },
+    		{ label: "Item 2", href: "#" },
+    		{ label: "Item 3", href: "#" },
+    		{ label: "Item 4", href: "#" },
+    		{ label: "Item 5", href: "#" },
+    		{ label: "Item 6", href: "#" },
+    		{ label: "Item 7", href: "#" }
+    	];
+
+    	// Mobile menu click event handler
+    	const handleMobileIconClick = () => $$invalidate(0, showMobileMenu = !showMobileMenu);
+
+    	// Media match query handler
+    	const mediaQueryHandler = e => {
+    		// Reset mobile state
+    		if (!e.matches) {
+    			$$invalidate(0, showMobileMenu = false);
+    		}
+    	};
+
+    	// Attach media query listener on mount hook
+    	onMount(() => {
+    		const mediaListener = window.matchMedia("(max-width: 767px)");
+    		mediaListener.addListener(mediaQueryHandler);
+    	});
+
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Menu> was created with unknown prop '${key}'`);
+    	});
+
+    	$$self.$capture_state = () => ({
+    		onMount,
+    		showMobileMenu,
+    		navItems,
+    		handleMobileIconClick,
+    		mediaQueryHandler
+    	});
+
+    	$$self.$inject_state = $$props => {
+    		if ('showMobileMenu' in $$props) $$invalidate(0, showMobileMenu = $$props.showMobileMenu);
+    	};
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	return [showMobileMenu, navItems, handleMobileIconClick];
+    }
+
+    class Menu extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$1, create_fragment$1, safe_not_equal, {});
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "Menu",
+    			options,
+    			id: create_fragment$1.name
+    		});
+    	}
+    }
+
     /* src/App.svelte generated by Svelte v3.44.2 */
+    const file = "src/App.svelte";
 
     function create_fragment(ctx) {
-    	let map;
+    	let map0;
+    	let t;
+    	let div;
+    	let map1;
     	let current;
 
-    	map = new Map$1({
+    	map0 = new Map$1({
+    			props: { lat: 40, lon: 0, zoom: 3.5 },
+    			$$inline: true
+    		});
+
+    	map1 = new Map$1({
     			props: { lat: 40, lon: 0, zoom: 3.5 },
     			$$inline: true
     		});
 
     	const block = {
     		c: function create() {
-    			create_component(map.$$.fragment);
+    			create_component(map0.$$.fragment);
+    			t = space();
+    			div = element("div");
+    			create_component(map1.$$.fragment);
+    			attr_dev(div, "class", "map-container");
+    			add_location(div, file, 173, 0, 2954);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
     		},
     		m: function mount(target, anchor) {
-    			mount_component(map, target, anchor);
+    			mount_component(map0, target, anchor);
+    			insert_dev(target, t, anchor);
+    			insert_dev(target, div, anchor);
+    			mount_component(map1, div, null);
     			current = true;
     		},
     		p: noop,
     		i: function intro(local) {
     			if (current) return;
-    			transition_in(map.$$.fragment, local);
+    			transition_in(map0.$$.fragment, local);
+    			transition_in(map1.$$.fragment, local);
     			current = true;
     		},
     		o: function outro(local) {
-    			transition_out(map.$$.fragment, local);
+    			transition_out(map0.$$.fragment, local);
+    			transition_out(map1.$$.fragment, local);
     			current = false;
     		},
     		d: function destroy(detaching) {
-    			destroy_component(map, detaching);
+    			destroy_component(map0, detaching);
+    			if (detaching) detach_dev(t);
+    			if (detaching) detach_dev(div);
+    			destroy_component(map1);
     		}
     	};
 
@@ -1172,7 +1994,7 @@ var app = (function () {
     		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<App> was created with unknown prop '${key}'`);
     	});
 
-    	$$self.$capture_state = () => ({ Map: Map$1, MapMarker });
+    	$$self.$capture_state = () => ({ Map: Map$1, MapMarker, Menu });
     	return [];
     }
 
@@ -1194,7 +2016,6 @@ var app = (function () {
     	target: document.body,
     	props: {
     		name: 'world'
-    		
     	}
     });
 
