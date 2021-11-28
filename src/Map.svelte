@@ -28,8 +28,8 @@
     let grid;
     let path = [];
     let data;
-    let selectedCells = [];
-    let selectedCellsId = 'selected-cells';
+    let level = [[],[],[],[]];
+    let levelId = ['level-one','level-two','level-three','level-four'];
 
 	function load() { 
 		map = new mapbox.Map({
@@ -40,6 +40,11 @@
 		});
         // Add zoom and rotation controls to the map.
         map.addControl(new mapboxgl.NavigationControl());
+        // add control scale to map
+        map.addControl(new mapboxgl.ScaleControl({
+            maxWidth: 100,
+            unit: 'metric'
+        }));
         grid = new MaplibreGrid.Grid({
             gridWidth: 10,  
             gridHeight: 10,
@@ -51,7 +56,6 @@
                 "line-color": "#FFF"
                 }
         });
-        // map.moveLayer('')
         map.addControl(grid);
 	}
 
@@ -70,23 +74,6 @@
             "raster-opacity": 1
             }
         })
-    }
-    function dirtLayer()
-    {
-        // map.addLayer({
-        //     'id': 'dirt',
-        //     'type': 'raster',
-        //     'source': {
-        //     'type': "raster",
-        //     'tiles': ['https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png'],
-        //     'tileSize': 256
-        //     },
-        //     "minzoom": 1,
-        //     "maxzoom": 22,
-        //     "paint": {
-        //     "raster-opacity": 1
-        //     }
-        // })
     }
     function initLine(){
         data = { 'type': 'Feature',
@@ -112,30 +99,76 @@
         });
     }
 
+    async function queryOnWater(lat, lon)
+    {
+        // TODO: uncomment
+        // let token = 'KdjuCzo_PW56GE5tsr5e';
+        // let resp = await fetch(`https://api.onwater.io/api/v1/results/${lat},${lon}?access_token=${token}`);
+        // return await resp.json();
+
+        return {water: true};
+    }
+
 	onDestroy(() => {
         map.removeControl(grid);
 		if (map) map.remove();
 	});
 
-    function selectBox(bbox){
-        const cellIndex = selectedCells.findIndex(x => x.geometry.bbox.toString() === bbox.toString());
-        if (cellIndex === -1) {
-            const coordinates = [
-            [
-                [bbox[0], bbox[1]],
-                [bbox[2], bbox[1]],
-                [bbox[2], bbox[3]],
-                [bbox[0], bbox[3]],
-                [bbox[0], bbox[1]],
-            ]
-            ];
-            const cell = { type: 'Feature', geometry: { type: 'Polygon', bbox, coordinates }};
-            selectedCells.push(cell);
+    function selectBox(bbox,amount){
+        let i = amount < 20 ? 0 : amount < 40 ? 1 :  amount < 60 ? 2 : 3 ;
+        if(i!=0){
+            let cellIndex = level[i-1].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
+            if (cellIndex === -1) {
+                cellIndex = level[i].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
+                if (cellIndex === -1) {
+                    let coordinates = [
+                    [
+                        [bbox[0], bbox[1]],
+                        [bbox[2], bbox[1]],
+                        [bbox[2], bbox[3]],
+                        [bbox[0], bbox[3]],
+                        [bbox[0], bbox[1]],
+                    ]
+                    ];
+                    let cell = { type: 'Feature', geometry: { type: 'Polygon', bbox, coordinates }};
+                    level[i].push(cell);
+                }
+            }
+            else{
+                let cell = level[i-1].splice(cellIndex, 1);
+                level[i].push(cell);
+            }
+            let source1 = map.getSource(levelId[i-1]);
+            source1.setData({ type: 'FeatureCollection', features: level[i-1] });
         }
-        const source = map.getSource(selectedCellsId);
-        source.setData({ type: 'FeatureCollection', features: selectedCells });
+        else{
+            cellIndex = level[i].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
+            if (cellIndex === -1) {
+                let coordinates = [
+                [
+                    [bbox[0], bbox[1]],
+                    [bbox[2], bbox[1]],
+                    [bbox[2], bbox[3]],
+                    [bbox[0], bbox[3]],
+                    [bbox[0], bbox[1]],
+                ]
+                ];
+                let cell = { type: 'Feature', geometry: { type: 'Polygon', bbox, coordinates }};
+                level[i].push(cell);
+            }
+        }
+        let source2 = map.getSource(levelId[i]);
+        source2.setData({ type: 'FeatureCollection', features: level[i] });
     }
-
+    // map.on('mousemove', (e) => {
+    //     document.getElementById('info').innerHTML =
+    //     // `e.point` is the x, y coordinates of the `mousemove` event
+    //     // relative to the top-left corner of the map.
+    //     JSON.stringify(e.point) +
+    //     '<br />' +
+    //     // `e.lngLat` is the longitude, latitude geographical position of the event.
+    //     JSON.stringify(e.lngLat.wrap());
+    // });
 
 </script>
 
@@ -160,43 +193,70 @@
 {#if map}
     {map.on('load', () => {
         seaLayer();
-        dirtLayer();
         initLine();
-        map.addSource(selectedCellsId, {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: selectedCells }
-        });
-        map.addLayer({
-            id: selectedCellsId,
-            source: selectedCellsId,
-            type: 'fill',
-            paint: {
-                'fill-color': '#00f',
-                'fill-opacity': 0.2,
-                'fill-outline-color': 'transparent'
-            }
-        });
+        for(let i = 0; i < 4; i++)
+        {
+            map.addSource(levelId[i], {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: level[i] }
+            });
+            let colors = ['#00ff00','#448800','#884400','#ff0000'];
+            map.addLayer({
+                id: levelId[i],
+                source: levelId[i],
+                type: 'fill',
+                paint: {
+                    'fill-color': colors[i],
+                    'fill-opacity': 0.6,
+                    'fill-outline-color': 'transparent'
+                }
+            });
+        }
         fetch("http://127.0.0.1:5001/api/location/getbox").then(x => x.json()).then(x => {
             console.log(x)
             x.forEach(element => {
+                var timestamp = element[1];
+
                 var bbox = [element[2],element[3],element[4],element[5]];
-                selectBox(bbox);
+                var amount = element[6];
+                selectBox(bbox,amount);
             });
         }
         );
+        console.log(map.getStyle().layers);
+        map.moveLayer('Land');
     })}
 
-    {map.on(MaplibreGrid.GRID_CLICK_EVENT, event =>{
-        console.log(event.bbox);
-        var [lon1,lat1,lon2,lat2] = event.bbox;
+    {map.on(MaplibreGrid.GRID_CLICK_EVENT, async function(event) {
+        var bbox = event.bbox;
+        console.log(bbox);
+        var [lon1,lat1,lon2,lat2] = bbox;
         var lon = (lon1 + lon2)/2;
         var lat = (lat1 + lat2)/2;
+
+
+        let onWater = await queryOnWater(lat, lon);
+        // console.log(onWater);
+        if (!onWater.water)
+        {
+            console.log("not on water");
+            return;
+        }
+
         console.log([lon,lat]);
         path.push([lon,lat]);
 
-        selectBox(event.bbox);
+        // todo: set amount
+        let amount = 79;
+        selectBox(bbox,amount);
+        fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
+            mode: 'no-cors',
+            headers: {
+                'Access-Control-Allow-Origin':'*'
+            }
+        })
 
-
+        /*
         if (path.length > 1)
         {
             let [prev_lon, prev_lat] = path[path.length-2];
@@ -224,37 +284,37 @@
             // console.log(distance);
             // console.log("step:");
             // console.log([lon_step, lat_step]);
-            console.log("TRACE PATH START");
+            // console.log("TRACE PATH START");
 
             for (let i = 0; i < distance; i++)
             {
                 iter_lon += lon_step;
                 iter_lat += lat_step;
-                console.log([iter_lon, iter_lat]);
+                // console.log([iter_lon, iter_lat]);
 
                 const bbox = getGridCell([iter_lon, iter_lat], 10, 10, 'kilometers');
                 // todo: set amount
                 let amount = 99;
+                selectBox(bbox,amount);
                 fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
                 mode: 'no-cors',
                 headers: {
                     'Access-Control-Allow-Origin':'*'
                 }
                 })
-                selectBox(bbox);
 
-                console.log(bbox)
+                // console.log(bbox)
             }
 
-            console.log("TRACE PATH END")
-        }
+            // console.log("TRACE PATH END")
+        }*/
 
         if(path.length > 1)
         {
             map.getSource('path').setData(data);
         }
-        console.log(path);
-      })}
+        console.log(path);})
+    })
 {/if}
 
 <style>
@@ -262,4 +322,26 @@
 		width: 100%;
 		height: 100%;
 	}
+    #info {
+        display: table;
+        position: relative;
+        margin: 0px auto;
+        word-wrap: anywhere;
+        white-space: pre-wrap;
+        padding: 10px;
+        border: none;
+        border-radius: 3px;
+        font-size: 12px;
+        text-align: center;
+        color: #222;
+        background: #fff;
+    }
+    .marker {
+        /* background-image: url('mapbox-icon.png'); */
+        background-size: cover;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        cursor: pointer;
+    }
 </style>

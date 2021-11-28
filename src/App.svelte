@@ -172,6 +172,8 @@
 <Map lat={40} lon={0} zoom={3.5} >
 </Map>
 
+<!--<Info id="info"></Info>-->
+
 <style>
 	/* beginning of classes for login form */
 

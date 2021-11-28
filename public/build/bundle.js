@@ -1106,7 +1106,7 @@ var app = (function () {
     const { console: console_1 } = globals;
     const file$1 = "src/Map.svelte";
 
-    // (155:1) {#if map}
+    // (188:1) {#if map}
     function create_if_block_1(ctx) {
     	let current;
     	const default_slot_template = /*#slots*/ ctx[14].default;
@@ -1157,31 +1157,34 @@ var app = (function () {
     		block,
     		id: create_if_block_1.name,
     		type: "if",
-    		source: "(155:1) {#if map}",
+    		source: "(188:1) {#if map}",
     		ctx
     	});
 
     	return block;
     }
 
-    // (160:0) {#if map}
+    // (193:0) {#if map}
     function create_if_block(ctx) {
     	let t0_value = /*map*/ ctx[1].on('load', /*func*/ ctx[16]) + "";
     	let t0;
     	let t1;
     	let t2_value = /*map*/ ctx[1].on(maplibreGrid_min.GRID_CLICK_EVENT, /*func_1*/ ctx[17]) + "";
     	let t2;
+    	let t3;
 
     	const block = {
     		c: function create() {
     			t0 = text(t0_value);
     			t1 = space();
     			t2 = text(t2_value);
+    			t3 = text(")");
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, t0, anchor);
     			insert_dev(target, t1, anchor);
     			insert_dev(target, t2, anchor);
+    			insert_dev(target, t3, anchor);
     		},
     		p: function update(ctx, dirty) {
     			if (dirty & /*map*/ 2 && t0_value !== (t0_value = /*map*/ ctx[1].on('load', /*func*/ ctx[16]) + "")) set_data_dev(t0, t0_value);
@@ -1191,6 +1194,7 @@ var app = (function () {
     			if (detaching) detach_dev(t0);
     			if (detaching) detach_dev(t1);
     			if (detaching) detach_dev(t2);
+    			if (detaching) detach_dev(t3);
     		}
     	};
 
@@ -1198,7 +1202,7 @@ var app = (function () {
     		block,
     		id: create_if_block.name,
     		type: "if",
-    		source: "(160:0) {#if map}",
+    		source: "(193:0) {#if map}",
     		ctx
     	});
 
@@ -1230,15 +1234,15 @@ var app = (function () {
     			if_block1_anchor = empty();
     			attr_dev(link0, "rel", "stylesheet");
     			attr_dev(link0, "href", "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.0-2/css/all.min.css");
-    			add_location(link0, file$1, 143, 4, 3779);
+    			add_location(link0, file$1, 176, 4, 5407);
     			attr_dev(link1, "rel", "stylesheet");
     			attr_dev(link1, "href", "https://unpkg.com/mapbox-gl/dist/mapbox-gl.css");
-    			add_location(link1, file$1, 144, 1, 3888);
+    			add_location(link1, file$1, 177, 1, 5516);
     			set_style(div, "width", "auto");
     			set_style(div, "margin-left", "auto");
     			set_style(div, "margin-right", "0");
-    			attr_dev(div, "class", "svelte-1c44y5p");
-    			add_location(div, file$1, 153, 0, 4030);
+    			attr_dev(div, "class", "svelte-1bp8d8d");
+    			add_location(div, file$1, 186, 0, 5658);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
@@ -1332,10 +1336,13 @@ var app = (function () {
     	return block;
     }
 
-    function dirtLayer() {
-    	
-    } // map.addLayer({
-    //     'id': 'dirt',
+    async function queryOnWater(lat, lon) {
+    	// TODO: uncomment
+    	// let token = 'KdjuCzo_PW56GE5tsr5e';
+    	// let resp = await fetch(`https://api.onwater.io/api/v1/results/${lat},${lon}?access_token=${token}`);
+    	// return await resp.json();
+    	return { water: true };
+    }
 
     function instance$2($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
@@ -1357,8 +1364,8 @@ var app = (function () {
     	let grid;
     	let path = [];
     	let data;
-    	let selectedCells = [];
-    	let selectedCellsId = 'selected-cells';
+    	let level = [[], [], [], []];
+    	let levelId = ['level-one', 'level-two', 'level-three', 'level-four'];
 
     	function load() {
     		$$invalidate(1, map = new mapboxGl.Map({
@@ -1371,6 +1378,9 @@ var app = (function () {
     		// Add zoom and rotation controls to the map.
     		map.addControl(new mapboxGl.NavigationControl());
 
+    		// add control scale to map
+    		map.addControl(new mapboxGl.ScaleControl({ maxWidth: 100, unit: 'metric' }));
+
     		grid = new maplibreGrid_min.Grid({
     				gridWidth: 10,
     				gridHeight: 10,
@@ -1380,7 +1390,6 @@ var app = (function () {
     				paint: { 'line-opacity': .5, "line-color": "#FFF" }
     			});
 
-    		// map.moveLayer('')
     		map.addControl(grid);
     	}
 
@@ -1399,18 +1408,6 @@ var app = (function () {
     		});
     	}
 
-    	//     'type': 'raster',
-    	//     'source': {
-    	//     'type': "raster",
-    	//     'tiles': ['https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png'],
-    	//     'tileSize': 256
-    	//     },
-    	//     "minzoom": 1,
-    	//     "maxzoom": 22,
-    	//     "paint": {
-    	//     "raster-opacity": 1
-    	//     }
-    	// })
     	function initLine() {
     		$$invalidate(2, data = {
     			'type': 'Feature',
@@ -1440,33 +1437,72 @@ var app = (function () {
     		if (map) map.remove();
     	});
 
-    	function selectBox(bbox) {
-    		const cellIndex = selectedCells.findIndex(x => x.geometry.bbox.toString() === bbox.toString());
+    	function selectBox(bbox, amount) {
+    		let i = amount < 20 ? 0 : amount < 40 ? 1 : amount < 60 ? 2 : 3;
 
-    		if (cellIndex === -1) {
-    			const coordinates = [
-    				[
-    					[bbox[0], bbox[1]],
-    					[bbox[2], bbox[1]],
-    					[bbox[2], bbox[3]],
-    					[bbox[0], bbox[3]],
-    					[bbox[0], bbox[1]]
-    				]
-    			];
+    		if (i != 0) {
+    			let cellIndex = level[i - 1].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
 
-    			const cell = {
-    				type: 'Feature',
-    				geometry: { type: 'Polygon', bbox, coordinates }
-    			};
+    			if (cellIndex === -1) {
+    				cellIndex = level[i].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
 
-    			selectedCells.push(cell);
+    				if (cellIndex === -1) {
+    					let coordinates = [
+    						[
+    							[bbox[0], bbox[1]],
+    							[bbox[2], bbox[1]],
+    							[bbox[2], bbox[3]],
+    							[bbox[0], bbox[3]],
+    							[bbox[0], bbox[1]]
+    						]
+    					];
+
+    					let cell = {
+    						type: 'Feature',
+    						geometry: { type: 'Polygon', bbox, coordinates }
+    					};
+
+    					level[i].push(cell);
+    				}
+    			} else {
+    				let cell = level[i - 1].splice(cellIndex, 1);
+    				level[i].push(cell);
+    			}
+
+    			let source1 = map.getSource(levelId[i - 1]);
+
+    			source1.setData({
+    				type: 'FeatureCollection',
+    				features: level[i - 1]
+    			});
+    		} else {
+    			cellIndex = level[i].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
+
+    			if (cellIndex === -1) {
+    				let coordinates = [
+    					[
+    						[bbox[0], bbox[1]],
+    						[bbox[2], bbox[1]],
+    						[bbox[2], bbox[3]],
+    						[bbox[0], bbox[3]],
+    						[bbox[0], bbox[1]]
+    					]
+    				];
+
+    				let cell = {
+    					type: 'Feature',
+    					geometry: { type: 'Polygon', bbox, coordinates }
+    				};
+
+    				level[i].push(cell);
+    			}
     		}
 
-    		const source = map.getSource(selectedCellsId);
+    		let source2 = map.getSource(levelId[i]);
 
-    		source.setData({
+    		source2.setData({
     			type: 'FeatureCollection',
-    			features: selectedCells
+    			features: level[i]
     		});
     	}
 
@@ -1487,91 +1523,123 @@ var app = (function () {
     		seaLayer();
     		initLine();
 
-    		map.addSource(selectedCellsId, {
-    			type: 'geojson',
-    			data: {
-    				type: 'FeatureCollection',
-    				features: selectedCells
-    			}
-    		});
+    		for (let i = 0; i < 4; i++) {
+    			map.addSource(levelId[i], {
+    				type: 'geojson',
+    				data: {
+    					type: 'FeatureCollection',
+    					features: level[i]
+    				}
+    			});
 
-    		map.addLayer({
-    			id: selectedCellsId,
-    			source: selectedCellsId,
-    			type: 'fill',
-    			paint: {
-    				'fill-color': '#00f',
-    				'fill-opacity': 0.2,
-    				'fill-outline-color': 'transparent'
-    			}
-    		});
+    			let colors = ['#00ff00', '#448800', '#884400', '#ff0000'];
+
+    			map.addLayer({
+    				id: levelId[i],
+    				source: levelId[i],
+    				type: 'fill',
+    				paint: {
+    					'fill-color': colors[i],
+    					'fill-opacity': 0.6,
+    					'fill-outline-color': 'transparent'
+    				}
+    			});
+    		}
 
     		fetch("http://127.0.0.1:5001/api/location/getbox").then(x => x.json()).then(x => {
     			console.log(x);
 
     			x.forEach(element => {
+    				element[1];
     				var bbox = [element[2], element[3], element[4], element[5]];
-    				selectBox(bbox);
+    				var amount = element[6];
+    				selectBox(bbox, amount);
     			});
     		});
+
+    		console.log(map.getStyle().layers);
+    		map.moveLayer('Land');
     	};
 
-    	const func_1 = event => {
-    		console.log(event.bbox);
-    		var [lon1, lat1, lon2, lat2] = event.bbox;
+    	const func_1 = async function (event) {
+    		var bbox = event.bbox;
+    		console.log(bbox);
+    		var [lon1, lat1, lon2, lat2] = bbox;
     		var lon = (lon1 + lon2) / 2;
     		var lat = (lat1 + lat2) / 2;
-    		console.log([lon, lat]);
-    		path.push([lon, lat]);
-    		selectBox(event.bbox);
+    		let onWater = await queryOnWater();
 
-    		if (path.length > 1) {
-    			let [prev_lon, prev_lat] = path[path.length - 2];
-    			let [iter_lon, iter_lat] = [prev_lon, prev_lat];
-    			let lon_step = prev_lon < lon ? 0.01 : -0.01;
-    			let lat_step = prev_lat < lat ? 0.01 : -0.01;
-
-    			let latlondist = (lat1, lon1, lat2, lon2) => {
-    				let diff_lat = lat1 - lat2;
-    				let diff_lon = lon1 - lon2;
-    				return Math.sqrt(diff_lat * diff_lat + diff_lon * diff_lon);
-    			};
-
-    			let distance = latlondist(lat, lon, prev_lat, prev_lon) * 20;
-    			lon_step = (lon - prev_lon) / distance;
-    			lat_step = (lat - prev_lat) / distance;
-
-    			// console.log("source:");
-    			// console.log([prev_lon, prev_lat]);
-    			// console.log("destination:");
-    			// console.log([lon, lat]);
-    			// console.log("distance:");
-    			// console.log(distance);
-    			// console.log("step:");
-    			// console.log([lon_step, lat_step]);
-    			console.log("TRACE PATH START");
-
-    			for (let i = 0; i < distance; i++) {
-    				iter_lon += lon_step;
-    				iter_lat += lat_step;
-    				console.log([iter_lon, iter_lat]);
-    				const bbox = getGridCell([iter_lon, iter_lat], 10, 10, 'kilometers');
-
-    				// todo: set amount
-    				let amount = 99;
-
-    				fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
-    					mode: 'no-cors',
-    					headers: { 'Access-Control-Allow-Origin': '*' }
-    				});
-
-    				selectBox(bbox);
-    				console.log(bbox);
-    			}
-
-    			console.log("TRACE PATH END");
+    		// console.log(onWater);
+    		if (!onWater.water) {
+    			console.log("not on water");
+    			return;
     		}
 
+    		console.log([lon, lat]);
+    		path.push([lon, lat]);
+
+    		// todo: set amount
+    		let amount = 79;
+
+    		selectBox(bbox, amount);
+
+    		fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
+    			mode: 'no-cors',
+    			headers: { 'Access-Control-Allow-Origin': '*' }
+    		});
+
+    		/*
+    if (path.length > 1)
+    {
+        let [prev_lon, prev_lat] = path[path.length-2];
+
+        let [iter_lon, iter_lat] = [prev_lon, prev_lat];
+        let lon_step = prev_lon < lon ? 0.01 : -0.01;
+        let lat_step = prev_lat < lat ? 0.01 : -0.01;
+
+        let latlondist = (lat1, lon1, lat2, lon2) =>
+        {
+            let diff_lat = lat1 - lat2
+            let diff_lon = lon1 - lon2
+            return Math.sqrt(diff_lat * diff_lat + diff_lon * diff_lon)
+        };
+
+        let distance = latlondist(lat, lon, prev_lat, prev_lon) * 20;
+        lon_step = (lon - prev_lon) / distance;
+        lat_step = (lat - prev_lat) / distance;
+
+        // console.log("source:");
+        // console.log([prev_lon, prev_lat]);
+        // console.log("destination:");
+        // console.log([lon, lat]);
+        // console.log("distance:");
+        // console.log(distance);
+        // console.log("step:");
+        // console.log([lon_step, lat_step]);
+        // console.log("TRACE PATH START");
+
+        for (let i = 0; i < distance; i++)
+        {
+            iter_lon += lon_step;
+            iter_lat += lat_step;
+            // console.log([iter_lon, iter_lat]);
+
+            const bbox = getGridCell([iter_lon, iter_lat], 10, 10, 'kilometers');
+            // todo: set amount
+            let amount = 99;
+            selectBox(bbox,amount);
+            fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
+            mode: 'no-cors',
+            headers: {
+                'Access-Control-Allow-Origin':'*'
+            }
+            })
+
+            // console.log(bbox)
+        }
+
+        // console.log("TRACE PATH END")
+    }*/
     		if (path.length > 1) {
     			map.getSource('path').setData(data);
     		}
@@ -1605,12 +1673,12 @@ var app = (function () {
     		grid,
     		path,
     		data,
-    		selectedCells,
-    		selectedCellsId,
+    		level,
+    		levelId,
     		load,
     		seaLayer,
-    		dirtLayer,
     		initLine,
+    		queryOnWater,
     		selectBox
     	});
 
@@ -1623,8 +1691,8 @@ var app = (function () {
     		if ('grid' in $$props) grid = $$props.grid;
     		if ('path' in $$props) $$invalidate(3, path = $$props.path);
     		if ('data' in $$props) $$invalidate(2, data = $$props.data);
-    		if ('selectedCells' in $$props) $$invalidate(4, selectedCells = $$props.selectedCells);
-    		if ('selectedCellsId' in $$props) $$invalidate(5, selectedCellsId = $$props.selectedCellsId);
+    		if ('level' in $$props) $$invalidate(4, level = $$props.level);
+    		if ('levelId' in $$props) $$invalidate(5, levelId = $$props.levelId);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -1636,8 +1704,8 @@ var app = (function () {
     		map,
     		data,
     		path,
-    		selectedCells,
-    		selectedCellsId,
+    		level,
+    		levelId,
     		load,
     		seaLayer,
     		initLine,
