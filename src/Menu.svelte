@@ -176,6 +176,16 @@ import { element } from "svelte/internal";
       logged_in = false;
   }
 
+  function move() {
+    const event = new Event('move');
+    elem.dispatchEvent(event);
+  }
+
+  function fish() {
+    const event = new Event('fish');
+    elem.dispatchEvent(event);
+  }
+
 </script>
   
   <nav>
@@ -203,10 +213,10 @@ import { element } from "svelte/internal";
           </li>
         {:else}
           <li>
-            <img src="fishrod.png" style="height:auto width:auto" alt="fish">
+            <img src="fishrod.png" style="height:auto width:auto" alt="fish" on:click={fish}>
           </li>
           <li>
-            <img src="fishy.png" style="height:5% width:5%" alt="move">
+            <img src="fishy.png" style="height:5% width:5%" alt="move" on:click={move}>
           </li>
           <li>
             <h2 style="color:white" on:click={logout}>Logout</h2>
