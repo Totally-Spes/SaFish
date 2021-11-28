@@ -1106,11 +1106,11 @@ var app = (function () {
     const { console: console_1 } = globals;
     const file$1 = "src/Map.svelte";
 
-    // (188:1) {#if map}
+    // (196:1) {#if map}
     function create_if_block_1(ctx) {
     	let current;
-    	const default_slot_template = /*#slots*/ ctx[14].default;
-    	const default_slot = create_slot(default_slot_template, ctx, /*$$scope*/ ctx[13], null);
+    	const default_slot_template = /*#slots*/ ctx[16].default;
+    	const default_slot = create_slot(default_slot_template, ctx, /*$$scope*/ ctx[15], null);
 
     	const block = {
     		c: function create() {
@@ -1125,15 +1125,15 @@ var app = (function () {
     		},
     		p: function update(ctx, dirty) {
     			if (default_slot) {
-    				if (default_slot.p && (!current || dirty & /*$$scope*/ 8192)) {
+    				if (default_slot.p && (!current || dirty & /*$$scope*/ 32768)) {
     					update_slot_base(
     						default_slot,
     						default_slot_template,
     						ctx,
-    						/*$$scope*/ ctx[13],
+    						/*$$scope*/ ctx[15],
     						!current
-    						? get_all_dirty_from_scope(/*$$scope*/ ctx[13])
-    						: get_slot_changes(default_slot_template, /*$$scope*/ ctx[13], dirty, null),
+    						? get_all_dirty_from_scope(/*$$scope*/ ctx[15])
+    						: get_slot_changes(default_slot_template, /*$$scope*/ ctx[15], dirty, null),
     						null
     					);
     				}
@@ -1157,44 +1157,40 @@ var app = (function () {
     		block,
     		id: create_if_block_1.name,
     		type: "if",
-    		source: "(188:1) {#if map}",
+    		source: "(196:1) {#if map}",
     		ctx
     	});
 
     	return block;
     }
 
-    // (193:0) {#if map}
+    // (201:0) {#if map}
     function create_if_block(ctx) {
-    	let t0_value = /*map*/ ctx[1].on('load', /*func*/ ctx[16]) + "";
+    	let t0_value = /*map*/ ctx[1].on('load', /*func*/ ctx[18]) + "";
     	let t0;
     	let t1;
-    	let t2_value = /*map*/ ctx[1].on(maplibreGrid_min.GRID_CLICK_EVENT, /*func_1*/ ctx[17]) + "";
+    	let t2_value = /*map*/ ctx[1].on(maplibreGrid_min.GRID_CLICK_EVENT, /*func_1*/ ctx[19]) + "";
     	let t2;
-    	let t3;
 
     	const block = {
     		c: function create() {
     			t0 = text(t0_value);
     			t1 = space();
     			t2 = text(t2_value);
-    			t3 = text(")");
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, t0, anchor);
     			insert_dev(target, t1, anchor);
     			insert_dev(target, t2, anchor);
-    			insert_dev(target, t3, anchor);
     		},
     		p: function update(ctx, dirty) {
-    			if (dirty & /*map*/ 2 && t0_value !== (t0_value = /*map*/ ctx[1].on('load', /*func*/ ctx[16]) + "")) set_data_dev(t0, t0_value);
-    			if (dirty & /*map, data*/ 6 && t2_value !== (t2_value = /*map*/ ctx[1].on(maplibreGrid_min.GRID_CLICK_EVENT, /*func_1*/ ctx[17]) + "")) set_data_dev(t2, t2_value);
+    			if (dirty & /*map*/ 2 && t0_value !== (t0_value = /*map*/ ctx[1].on('load', /*func*/ ctx[18]) + "")) set_data_dev(t0, t0_value);
+    			if (dirty & /*map, data, fishAmount*/ 14 && t2_value !== (t2_value = /*map*/ ctx[1].on(maplibreGrid_min.GRID_CLICK_EVENT, /*func_1*/ ctx[19]) + "")) set_data_dev(t2, t2_value);
     		},
     		d: function destroy(detaching) {
     			if (detaching) detach_dev(t0);
     			if (detaching) detach_dev(t1);
     			if (detaching) detach_dev(t2);
-    			if (detaching) detach_dev(t3);
     		}
     	};
 
@@ -1202,7 +1198,7 @@ var app = (function () {
     		block,
     		id: create_if_block.name,
     		type: "if",
-    		source: "(193:0) {#if map}",
+    		source: "(201:0) {#if map}",
     		ctx
     	});
 
@@ -1234,15 +1230,15 @@ var app = (function () {
     			if_block1_anchor = empty();
     			attr_dev(link0, "rel", "stylesheet");
     			attr_dev(link0, "href", "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.0-2/css/all.min.css");
-    			add_location(link0, file$1, 176, 4, 5407);
+    			add_location(link0, file$1, 184, 4, 5598);
     			attr_dev(link1, "rel", "stylesheet");
     			attr_dev(link1, "href", "https://unpkg.com/mapbox-gl/dist/mapbox-gl.css");
-    			add_location(link1, file$1, 177, 1, 5516);
+    			add_location(link1, file$1, 185, 1, 5707);
     			set_style(div, "width", "auto");
     			set_style(div, "margin-left", "auto");
     			set_style(div, "margin-right", "0");
-    			attr_dev(div, "class", "svelte-1bp8d8d");
-    			add_location(div, file$1, 186, 0, 5658);
+    			attr_dev(div, "class", "svelte-152ub2p");
+    			add_location(div, file$1, 194, 0, 5849);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
@@ -1253,14 +1249,14 @@ var app = (function () {
     			insert_dev(target, t0, anchor);
     			insert_dev(target, div, anchor);
     			if (if_block0) if_block0.m(div, null);
-    			/*div_binding*/ ctx[15](div);
+    			/*div_binding*/ ctx[17](div);
     			insert_dev(target, t1, anchor);
     			if (if_block1) if_block1.m(target, anchor);
     			insert_dev(target, if_block1_anchor, anchor);
     			current = true;
 
     			if (!mounted) {
-    				dispose = listen_dev(link1, "load", /*load*/ ctx[6], false, false, false);
+    				dispose = listen_dev(link1, "load", /*load*/ ctx[8], false, false, false);
     				mounted = true;
     			}
     		},
@@ -1316,7 +1312,7 @@ var app = (function () {
     			if (detaching) detach_dev(t0);
     			if (detaching) detach_dev(div);
     			if (if_block0) if_block0.d();
-    			/*div_binding*/ ctx[15](null);
+    			/*div_binding*/ ctx[17](null);
     			if (detaching) detach_dev(t1);
     			if (if_block1) if_block1.d(detaching);
     			if (detaching) detach_dev(if_block1_anchor);
@@ -1366,6 +1362,8 @@ var app = (function () {
     	let data;
     	let level = [[], [], [], []];
     	let levelId = ['level-one', 'level-two', 'level-three', 'level-four'];
+    	let drawMode = true;
+    	let fishAmount;
 
     	function load() {
     		$$invalidate(1, map = new mapboxGl.Map({
@@ -1391,7 +1389,7 @@ var app = (function () {
     			});
 
     		map.addControl(grid);
-    	}
+    	} // add choropleth legend to map
 
     	function seaLayer() {
     		map.addLayer({
@@ -1437,11 +1435,15 @@ var app = (function () {
     		if (map) map.remove();
     	});
 
-    	function selectBox(bbox, amount) {
+    	function selectBox(bbox, amount, oldAmount) {
     		let i = amount < 20 ? 0 : amount < 40 ? 1 : amount < 60 ? 2 : 3;
 
+    		let j = oldAmount < 20
+    		? 0
+    		: oldAmount < 40 ? 1 : oldAmount < 60 ? 2 : 3;
+
     		if (i != 0) {
-    			let cellIndex = level[i - 1].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
+    			let cellIndex = level[j].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
 
     			if (cellIndex === -1) {
     				cellIndex = level[i].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
@@ -1465,15 +1467,15 @@ var app = (function () {
     					level[i].push(cell);
     				}
     			} else {
-    				let cell = level[i - 1].splice(cellIndex, 1);
+    				let cell = level[j].splice(cellIndex, 1);
     				level[i].push(cell);
     			}
 
-    			let source1 = map.getSource(levelId[i - 1]);
+    			let source1 = map.getSource(levelId[j]);
 
     			source1.setData({
     				type: 'FeatureCollection',
-    				features: level[i - 1]
+    				features: level[j]
     			});
     		} else {
     			cellIndex = level[i].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
@@ -1553,7 +1555,7 @@ var app = (function () {
     				element[1];
     				var bbox = [element[2], element[3], element[4], element[5]];
     				var amount = element[6];
-    				selectBox(bbox, amount);
+    				selectBox(bbox, amount, amount);
     			});
     		});
 
@@ -1564,31 +1566,48 @@ var app = (function () {
     	const func_1 = async function (event) {
     		var bbox = event.bbox;
     		console.log(bbox);
-    		var [lon1, lat1, lon2, lat2] = bbox;
-    		var lon = (lon1 + lon2) / 2;
-    		var lat = (lat1 + lat2) / 2;
-    		let onWater = await queryOnWater();
 
-    		// console.log(onWater);
-    		if (!onWater.water) {
-    			console.log("not on water");
-    			return;
+    		if (drawMode) {
+    			var [lon1, lat1, lon2, lat2] = bbox;
+    			var lon = (lon1 + lon2) / 2;
+    			var lat = (lat1 + lat2) / 2;
+    			console.log([lon, lat]);
+    			path.push([lon, lat]);
+
+    			if (path.length > 1) {
+    				map.getSource('path').setData(data);
+    			}
+
+    			console.log(path);
+    		} else {
+    			let onWater = await queryOnWater();
+
+    			// console.log(onWater);
+    			if (!onWater.water) {
+    				console.log("not on water");
+    				return;
+    			}
+
+    			fetch(`/api/location/getbox-1/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}`, {
+    				mode: 'no-cors',
+    				headers: { 'Access-Control-Allow-Origin': '*' }
+    			}).then(x => x.json()).then(x => {
+    				x.forEach(element => {
+    					$$invalidate(3, fishAmount += element[6]);
+    				});
+    			});
+
+    			//update fishAmount
+    			var oldAmount = fishAmount;
+
+    			selectBox(bbox, fishAmount, oldAmount);
+
+    			fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
+    				mode: 'no-cors',
+    				headers: { 'Access-Control-Allow-Origin': '*' }
+    			});
     		}
-
-    		console.log([lon, lat]);
-    		path.push([lon, lat]);
-
-    		// todo: set amount
-    		let amount = 79;
-
-    		selectBox(bbox, amount);
-
-    		fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
-    			mode: 'no-cors',
-    			headers: { 'Access-Control-Allow-Origin': '*' }
-    		});
-
-    		/*
+    	}; /*
     if (path.length > 1)
     {
         let [prev_lon, prev_lat] = path[path.length-2];
@@ -1640,18 +1659,12 @@ var app = (function () {
 
         // console.log("TRACE PATH END")
     }*/
-    		if (path.length > 1) {
-    			map.getSource('path').setData(data);
-    		}
-
-    		console.log(path);
-    	};
 
     	$$self.$$set = $$props => {
-    		if ('lat' in $$props) $$invalidate(10, lat = $$props.lat);
-    		if ('lon' in $$props) $$invalidate(11, lon = $$props.lon);
-    		if ('zoom' in $$props) $$invalidate(12, zoom = $$props.zoom);
-    		if ('$$scope' in $$props) $$invalidate(13, $$scope = $$props.$$scope);
+    		if ('lat' in $$props) $$invalidate(12, lat = $$props.lat);
+    		if ('lon' in $$props) $$invalidate(13, lon = $$props.lon);
+    		if ('zoom' in $$props) $$invalidate(14, zoom = $$props.zoom);
+    		if ('$$scope' in $$props) $$invalidate(15, $$scope = $$props.$$scope);
     	};
 
     	$$self.$capture_state = () => ({
@@ -1675,6 +1688,8 @@ var app = (function () {
     		data,
     		level,
     		levelId,
+    		drawMode,
+    		fishAmount,
     		load,
     		seaLayer,
     		initLine,
@@ -1683,16 +1698,18 @@ var app = (function () {
     	});
 
     	$$self.$inject_state = $$props => {
-    		if ('lat' in $$props) $$invalidate(10, lat = $$props.lat);
-    		if ('lon' in $$props) $$invalidate(11, lon = $$props.lon);
-    		if ('zoom' in $$props) $$invalidate(12, zoom = $$props.zoom);
+    		if ('lat' in $$props) $$invalidate(12, lat = $$props.lat);
+    		if ('lon' in $$props) $$invalidate(13, lon = $$props.lon);
+    		if ('zoom' in $$props) $$invalidate(14, zoom = $$props.zoom);
     		if ('container' in $$props) $$invalidate(0, container = $$props.container);
     		if ('map' in $$props) $$invalidate(1, map = $$props.map);
     		if ('grid' in $$props) grid = $$props.grid;
-    		if ('path' in $$props) $$invalidate(3, path = $$props.path);
+    		if ('path' in $$props) $$invalidate(4, path = $$props.path);
     		if ('data' in $$props) $$invalidate(2, data = $$props.data);
-    		if ('level' in $$props) $$invalidate(4, level = $$props.level);
-    		if ('levelId' in $$props) $$invalidate(5, levelId = $$props.levelId);
+    		if ('level' in $$props) $$invalidate(5, level = $$props.level);
+    		if ('levelId' in $$props) $$invalidate(6, levelId = $$props.levelId);
+    		if ('drawMode' in $$props) $$invalidate(7, drawMode = $$props.drawMode);
+    		if ('fishAmount' in $$props) $$invalidate(3, fishAmount = $$props.fishAmount);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -1703,9 +1720,11 @@ var app = (function () {
     		container,
     		map,
     		data,
+    		fishAmount,
     		path,
     		level,
     		levelId,
+    		drawMode,
     		load,
     		seaLayer,
     		initLine,
@@ -1724,7 +1743,7 @@ var app = (function () {
     class Map$1 extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-    		init(this, options, instance$2, create_fragment$2, safe_not_equal, { lat: 10, lon: 11, zoom: 12 });
+    		init(this, options, instance$2, create_fragment$2, safe_not_equal, { lat: 12, lon: 13, zoom: 14 });
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
@@ -1736,15 +1755,15 @@ var app = (function () {
     		const { ctx } = this.$$;
     		const props = options.props || {};
 
-    		if (/*lat*/ ctx[10] === undefined && !('lat' in props)) {
+    		if (/*lat*/ ctx[12] === undefined && !('lat' in props)) {
     			console_1.warn("<Map> was created without expected prop 'lat'");
     		}
 
-    		if (/*lon*/ ctx[11] === undefined && !('lon' in props)) {
+    		if (/*lon*/ ctx[13] === undefined && !('lon' in props)) {
     			console_1.warn("<Map> was created without expected prop 'lon'");
     		}
 
-    		if (/*zoom*/ ctx[12] === undefined && !('zoom' in props)) {
+    		if (/*zoom*/ ctx[14] === undefined && !('zoom' in props)) {
     			console_1.warn("<Map> was created without expected prop 'zoom'");
     		}
     	}

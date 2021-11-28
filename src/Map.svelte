@@ -30,6 +30,8 @@
     let data;
     let level = [[],[],[],[]];
     let levelId = ['level-one','level-two','level-three','level-four'];
+    let drawMode = true;
+    let fishAmount;
 
 	function load() { 
 		map = new mapbox.Map({
@@ -57,6 +59,11 @@
                 }
         });
         map.addControl(grid);
+
+        // add choropleth legend to map
+        
+        
+
 	}
 
     function seaLayer(){
@@ -114,10 +121,11 @@
 		if (map) map.remove();
 	});
 
-    function selectBox(bbox,amount){
+    function selectBox(bbox,amount,oldAmount){
         let i = amount < 20 ? 0 : amount < 40 ? 1 :  amount < 60 ? 2 : 3 ;
+        let j = oldAmount < 20 ? 0 : oldAmount < 40 ? 1 :  oldAmount < 60 ? 2 : 3 ;
         if(i!=0){
-            let cellIndex = level[i-1].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
+            let cellIndex = level[j].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
             if (cellIndex === -1) {
                 cellIndex = level[i].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
                 if (cellIndex === -1) {
@@ -135,11 +143,11 @@
                 }
             }
             else{
-                let cell = level[i-1].splice(cellIndex, 1);
+                let cell = level[j].splice(cellIndex, 1);
                 level[i].push(cell);
             }
-            let source1 = map.getSource(levelId[i-1]);
-            source1.setData({ type: 'FeatureCollection', features: level[i-1] });
+            let source1 = map.getSource(levelId[j]);
+            source1.setData({ type: 'FeatureCollection', features: level[j] });
         }
         else{
             cellIndex = level[i].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
@@ -219,7 +227,7 @@
 
                 var bbox = [element[2],element[3],element[4],element[5]];
                 var amount = element[6];
-                selectBox(bbox,amount);
+                selectBox(bbox,amount,amount);
             });
         }
         );
@@ -230,31 +238,47 @@
     {map.on(MaplibreGrid.GRID_CLICK_EVENT, async function(event) {
         var bbox = event.bbox;
         console.log(bbox);
-        var [lon1,lat1,lon2,lat2] = bbox;
-        var lon = (lon1 + lon2)/2;
-        var lat = (lat1 + lat2)/2;
 
-
-        let onWater = await queryOnWater(lat, lon);
-        // console.log(onWater);
-        if (!onWater.water)
-        {
-            console.log("not on water");
-            return;
-        }
-
-        console.log([lon,lat]);
-        path.push([lon,lat]);
-
-        // todo: set amount
-        let amount = 79;
-        selectBox(bbox,amount);
-        fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
-            mode: 'no-cors',
-            headers: {
-                'Access-Control-Allow-Origin':'*'
+        if(drawMode){
+            var [lon1,lat1,lon2,lat2] = bbox;
+            var lon = (lon1 + lon2)/2;
+            var lat = (lat1 + lat2)/2;
+            console.log([lon,lat]);
+            path.push([lon,lat]);
+            if(path.length > 1)
+            {
+                map.getSource('path').setData(data);
             }
-        })
+            console.log(path);
+        }
+        else{
+            let onWater = await queryOnWater(lat, lon);
+            // console.log(onWater);
+            if (!onWater.water)
+            {
+                console.log("not on water");
+                return;
+            }
+            fetch(`/api/location/getbox-1/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}`, {
+                mode: 'no-cors',
+                headers: {
+                    'Access-Control-Allow-Origin':'*'
+                }}).then(x => x.json()).then(x => {
+                    x.forEach(element => {
+                        fishAmount += element[6];
+                    })
+                });
+            //update fishAmount
+            var oldAmount = fishAmount;
+
+            selectBox(bbox,fishAmount,oldAmount);
+            fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
+                mode: 'no-cors',
+                headers: {
+                    'Access-Control-Allow-Origin':'*'
+                }
+            })
+        }
 
         /*
         if (path.length > 1)
@@ -308,13 +332,7 @@
 
             // console.log("TRACE PATH END")
         }*/
-
-        if(path.length > 1)
-        {
-            map.getSource('path').setData(data);
-        }
-        console.log(path);})
-    })
+    })}
 {/if}
 
 <style>
@@ -343,5 +361,29 @@
         height: 50px;
         border-radius: 50%;
         cursor: pointer;
+    }
+
+    .legend {
+        background-color: #fff;
+        border-radius: 3px;
+        bottom: 30px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+        padding: 10px;
+        position: absolute;
+        right: 10px;
+        z-index: 1;
+    }
+    
+    .legend h4 {
+        margin: 0 0 10px;
+    }
+    
+    .legend div span {
+        border-radius: 50%;
+        display: inline-block;
+        height: 10px;
+        margin-right: 5px;
+        width: 10px;
     }
 </style>
