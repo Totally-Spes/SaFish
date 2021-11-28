@@ -169,6 +169,7 @@
 	<a href="#">Can't Sign in?</a>
 	<a href="#">Create Account</a>
 </form> -->
+<Menu/>
 <Map lat={40} lon={0} zoom={3.5} >
 </Map>
 
