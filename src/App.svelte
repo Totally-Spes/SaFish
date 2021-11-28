@@ -13,7 +13,7 @@
 <div class='my-legend'>
 	<div class='legend-scale'>
 	  <ul class='legend-labels'>
-		<li><span style='background:#;'></span>0%</li>
+		<li><span style='background:#2596be;'></span>0%</li>
 		<li><span style='background:#00FF00;'></span>0 - 20%</li>
 		<li><span style='background:#448800;'></span>20 - 40%</li>
 		<li><span style='background:#884400;'></span>40 - 60%</li>
@@ -29,10 +29,12 @@
 <style>
 	.my-legend {
 		margin: 12px;
+		position: absolute;
 	}
 	  .my-legend .legend-scale ul {
 		margin: 0;
 		padding: 0;
+		/* float: none; */
 		/* float: left; */
 		list-style: none;
 		z-index: 2;
@@ -42,8 +44,9 @@
 		}
 	  .my-legend .legend-scale ul li {
 		display: block;
-		float: left;
+		float: none;
 		width: 50px;
+		height: 40px;
 		margin-bottom: 6px;
 		text-align: center;
 		font-size: 80%;

@@ -227,7 +227,7 @@
 </svelte:head>
 
 <!-- MAP CONTAINER -->
-<div bind:this={container} style="margin-left: auto; margin-right: 0;z-index:1;">
+<div bind:this={container} style="margin-left: auto; margin-right: 0;z-index:1;position: absolute">
 	{#if map}
 		<slot />
 	{/if}@

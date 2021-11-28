@@ -188,11 +188,11 @@ import { createEventDispatcher } from 'svelte';
 
   async function register() {
       console.log("Register");
-      username = document.getElementsByName("user")[0].value;
+      let username = document.getElementsByName("user")[0].value;
       console.log(username);
-      password = document.getElementsByName("pass")[0].value;
+      let password = document.getElementsByName("pass")[0].value;
       console.log(password);
-      fishing = document.getElementsByName("fishing")[0].value;
+      let fishing = document.getElementsByName("fishing")[0].value;
       console.log(fishing);
       var hash = SHA256(password);
       console.log(hash);
