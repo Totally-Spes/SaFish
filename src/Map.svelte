@@ -14,6 +14,7 @@
 	export let lat;
 	export let lon;
 	export let zoom;
+	export let drawMode;
 
     // const express = require("express");
 	// const bodyParser = require("body-parser");
@@ -30,8 +31,11 @@
     let data;
     let level = [[],[],[],[]];
     let levelId = ['level-one','level-two','level-three','level-four'];
-    let drawMode = true;
+    
     let fishAmount;
+
+    
+
 
 	function load() { 
 		map = new mapbox.Map({
@@ -62,7 +66,7 @@
 
         // add choropleth legend to map
         
-        
+
 
 	}
 
@@ -121,35 +125,59 @@
 		if (map) map.remove();
 	});
 
-    function selectBox(bbox,amount,oldAmount){
+
+    function selectBox(bbox,amount,oldAmount, isInit = false){
+        let i = amount <= 20 ? 0 : amount <= 40 ? 1 :  amount <= 60 ? 2 : 3 ;
+        let j = oldAmount <= 20 ? 0 : oldAmount <= 40 ? 1 :  oldAmount <= 60 ? 2 : 3 ;
+
+        console.log("selectBox: i=" + i + "; j=" + j);
+        if (oldAmount == 0 || isInit)
+        {
+            let coordinates = [
+                [
+                    [bbox[0], bbox[1]],
+                    [bbox[2], bbox[1]],
+                    [bbox[2], bbox[3]],
+                    [bbox[0], bbox[3]],
+                    [bbox[0], bbox[1]],
+                ]
+            ];
+            console.log("creating cell");
+            let cell = { type: 'Feature', geometry: { type: 'Polygon', bbox, coordinates }};
+            level[i].push(cell);
+        }
+        else if (i == j)
+        {
+            console.log("same level");
+            return;
+        }
+        else
+        {
+            let cellIndex = level[j].findIndex(x =>
+            {
+                console.log(x);
+                return x.geometry.bbox.toString() === bbox.toString();
+            } );
+            console.log("removing cell in level j, adding cell in level i")
+            let cell = level[j][cellIndex];
+            level[i].push(cell);
+            level[j].splice(cellIndex, 1);
+            // let cell = level[j].splice(cellIndex, 1);
+        }
+
+        let source1 = map.getSource(levelId[j]);
+        source1.setData({ type: 'FeatureCollection', features: level[j] });
+
+        let source2 = map.getSource(levelId[i]);
+        source2.setData({ type: 'FeatureCollection', features: level[i] });
+    }
+
+    function selectBoxOld(bbox,amount,oldAmount){
         let i = amount < 20 ? 0 : amount < 40 ? 1 :  amount < 60 ? 2 : 3 ;
         let j = oldAmount < 20 ? 0 : oldAmount < 40 ? 1 :  oldAmount < 60 ? 2 : 3 ;
-        if(i!=0){
-            let cellIndex = level[j].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
-            if (cellIndex === -1) {
-                cellIndex = level[i].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
-                if (cellIndex === -1) {
-                    let coordinates = [
-                    [
-                        [bbox[0], bbox[1]],
-                        [bbox[2], bbox[1]],
-                        [bbox[2], bbox[3]],
-                        [bbox[0], bbox[3]],
-                        [bbox[0], bbox[1]],
-                    ]
-                    ];
-                    let cell = { type: 'Feature', geometry: { type: 'Polygon', bbox, coordinates }};
-                    level[i].push(cell);
-                }
-            }
-            else{
-                let cell = level[j].splice(cellIndex, 1);
-                level[i].push(cell);
-            }
-            let source1 = map.getSource(levelId[j]);
-            source1.setData({ type: 'FeatureCollection', features: level[j] });
-        }
-        else{
+
+        let cellIndex = level[j].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
+        if (cellIndex === -1) {
             cellIndex = level[i].findIndex(x => x.geometry.bbox.toString() === bbox.toString());
             if (cellIndex === -1) {
                 let coordinates = [
@@ -165,6 +193,13 @@
                 level[i].push(cell);
             }
         }
+        else{
+            let cell = level[j].splice(cellIndex, 1);
+            level[i].push(cell);
+        }
+        let source1 = map.getSource(levelId[j]);
+        source1.setData({ type: 'FeatureCollection', features: level[j] });
+        
         let source2 = map.getSource(levelId[i]);
         source2.setData({ type: 'FeatureCollection', features: level[i] });
     }
@@ -192,10 +227,10 @@
 </svelte:head>
 
 <!-- MAP CONTAINER -->
-<div bind:this={container} style="width:auto; margin-left: auto; margin-right: 0;">
+<div bind:this={container} style="margin-left: auto; margin-right: 0;z-index:1;">
 	{#if map}
 		<slot />
-	{/if}
+	{/if}@
 </div>
 
 {#if map}
@@ -227,7 +262,7 @@
 
                 var bbox = [element[2],element[3],element[4],element[5]];
                 var amount = element[6];
-                selectBox(bbox,amount,amount);
+                selectBox(bbox,amount,amount, true);
             });
         }
         );
@@ -239,7 +274,8 @@
         var bbox = event.bbox;
         console.log(bbox);
 
-        if(drawMode){
+        if(drawMode == 'move'){
+            console.log("draw in move mode");
             var [lon1,lat1,lon2,lat2] = bbox;
             var lon = (lon1 + lon2)/2;
             var lat = (lat1 + lat2)/2;
@@ -252,6 +288,7 @@
             console.log(path);
         }
         else{
+            console.log("draw in fish mode");
             let onWater = await queryOnWater(lat, lon);
             // console.log(onWater);
             if (!onWater.water)
@@ -259,20 +296,21 @@
                 console.log("not on water");
                 return;
             }
-            fetch(`/api/location/getbox-1/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}`, {
-                mode: 'no-cors',
-                headers: {
-                    'Access-Control-Allow-Origin':'*'
-                }}).then(x => x.json()).then(x => {
-                    x.forEach(element => {
-                        fishAmount += element[6];
-                    })
-                });
+            fishAmount = 0;
+            let resp = await fetch(`http://127.0.0.1:5001/api/location/getbox1/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}`);
+            let json = await resp.json();
+            
+            json.forEach(element => {
+                    fishAmount += element[0];
+            });
+
             //update fishAmount
             var oldAmount = fishAmount;
+            console.log("oldAmount = " + oldAmount);
+            fishAmount += 20;
 
             selectBox(bbox,fishAmount,oldAmount);
-            fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${amount}`, {
+            fetch(`http://127.0.0.1:5001/api/location/setbox/${bbox[0]}/${bbox[1]}/${bbox[2]}/${bbox[3]}/${fishAmount}`, {
                 mode: 'no-cors',
                 headers: {
                     'Access-Control-Allow-Origin':'*'

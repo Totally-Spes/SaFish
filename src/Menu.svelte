@@ -1,6 +1,7 @@
 <script>
-  import { onMount } from "svelte";
+import { onMount } from "svelte";
 import { element } from "svelte/internal";
+import { createEventDispatcher } from 'svelte';
 
   // text fields variables
   let username
@@ -8,6 +9,19 @@ import { element } from "svelte/internal";
   let api_link
   let logged_in = false
 
+	export let drawMode;
+
+  const dispatch = createEventDispatcher();
+
+  function move(event){
+    drawMode = 'move';
+    console.log(drawMode);
+  };
+
+  function fish(event){
+    drawMode = 'fish';
+    console.log(drawMode);
+  };
 
   // Show mobile icon and display menu
   let showMobileMenu = false;
@@ -168,7 +182,29 @@ import { element } from "svelte/internal";
           logged_in = true;
       } 
       else {
-          alert("Invalid username or password");
+          alert("Wrong username or password");
+      }
+  }
+
+  async function register() {
+      console.log("Register");
+      username = document.getElementsByName("user")[0].value;
+      console.log(username);
+      password = document.getElementsByName("pass")[0].value;
+      console.log(password);
+      fishing = document.getElementsByName("fishing")[0].value;
+      console.log(fishing);
+      var hash = SHA256(password);
+      console.log(hash);
+      let response = await fetch(`http://localhost:5001/api/account/add/${username}/${hash}/${fishing}`);
+      if (response.status == 200) {
+          logged_in = true;
+      } 
+      else if (response.status == 409) {
+          alert("Username already exists");
+      }
+      else {
+          alert("Wrong username or password");
       }
   }
 
@@ -176,15 +212,6 @@ import { element } from "svelte/internal";
       logged_in = false;
   }
 
-  function move() {
-    const event = new Event('move');
-    elem.dispatchEvent(event);
-  }
-
-  function fish() {
-    const event = new Event('fish');
-    elem.dispatchEvent(event);
-  }
 
 </script>
   
@@ -209,14 +236,25 @@ import { element } from "svelte/internal";
               minlength="8" maxlength="12" size="12" placeholder="password">
           </li>
           <li>
+            <select name="fishing" id="fishing">
+              <option value=""></option>
+              <option value="traine">Traîne</option>
+              <option value="ligne">Ligne</option>
+              <option value="derive">Dérive</option>
+            </select>
+          </li>
+          <li>
             <h2 style="color:white" on:click={login}>Login</h2>
+          </li>
+          <li>
+            <h2 style="color:white" on:click={register}>Register</h2>
           </li>
         {:else}
           <li>
             <img src="fishrod.png" style="height:auto width:auto" alt="fish" on:click={fish}>
           </li>
           <li>
-            <img src="fishy.png" style="height:5% width:5%" alt="move" on:click={move}>
+            <img src="fishy.png" style="height:auto width:auto" alt="move" on:click={move}>
           </li>
           <li>
             <h2 style="color:white" on:click={logout}>Logout</h2>
